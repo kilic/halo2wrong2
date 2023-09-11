@@ -1,0 +1,41 @@
+[package]
+authors = ["kilic <kiliconu@itu.edu.tr>"]
+edition = "2021"
+name = "ecc"
+version = "0.2.0"
+
+[dependencies]
+
+circuitry = {path = "../circuitry"}
+integer = {path = "../integer"}
+num-bigint = {version = "0.4", features = ["rand"]}
+num-integer = "0.1"
+num-traits = "0.2"
+# halo2 = { package = "halo2_proofs", git = "https://github.com/privacy-scaling-explorations/halo2", features = ["circuit-params"] }
+# halo2_axiom = {package = "halo2_proofs", path = "../../../axiom-crypto/halo2/halo2_proofs", optional = true}
+halo2_pse = {package = "halo2_proofs", path = "../../../privacy-scaling-explorations/halo2/halo2_proofs", optional = true}
+
+ark-std = {version = "^0.4.0", features = ["print-trace"]}
+
+ff = {package = "ff", version = "0.13.0", optional = true}
+group = {package = "group", version = "0.13.0", optional = true}
+
+ff_12 = {package = "ff", version = "0.12.0", optional = true}
+group_12 = {package = "group", version = "0.12.0", optional = true}
+
+subtle = {version = "2.3", default-features = false}
+
+[dev-dependencies]
+rand = "0.8"
+rand_core = {version = "0.6", default-features = false}
+rand_xorshift = "0.3"
+
+[features]
+default = ["info", "pse", "synth-sanity", "prover-sanity"]
+
+axiom = ["ff_12", "group_12"]
+pse = ["ff", "group", "halo2_pse"]
+
+info = []
+prover-sanity = []
+synth-sanity = []

@@ -1,0 +1,6 @@
+[workspace]
+members = [
+  "circuitry",
+  "integer",
+  "ecc",
+]
