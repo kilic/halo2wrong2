@@ -90,9 +90,16 @@ impl<
             if let Some(_acc) = acc {
                 acc = Some(self.double_incomplete(stack, &_acc));
             }
+
+            // TODO: use ladder
             if let Some(_correction) = correction {
                 correction = Some(self.double_incomplete(stack, &_correction));
             }
+            correction = if let Some(correction) = &correction {
+                Some(self.add_incomplete(stack, &correction, &acc_aux))
+            } else {
+                Some(acc_aux.clone())
+            };
 
             let mut chain = Vec::with_capacity(tables.len() + 1);
             if let Some(acc) = acc {
@@ -113,32 +120,26 @@ impl<
                 chain.push(to_add);
             }
             acc = Some(self.add_multi(stack, &chain[..]));
-
-            correction = if let Some(correction) = &correction {
-                Some(self.add_incomplete(stack, &correction, &acc_aux))
-            } else {
-                Some(acc_aux.clone())
-            };
         }
 
         self.sub_incomplete(stack, &acc.unwrap(), &correction.unwrap())
     }
 
-    fn assign_incremental_table<Stack: SecondDegreeChip<C::Scalar> + FirstDegreeChip<C::Scalar>>(
-        &self,
-        stack: &mut Stack,
+    // fn assign_incremental_table<Stack: SecondDegreeChip<C::Scalar> + FirstDegreeChip<C::Scalar>>(
+    //     &self,
+    //     stack: &mut Stack,
 
-        aux: &Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>,
-        point: &Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>,
-        window_size: usize,
-    ) -> Vec<Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>> {
-        let table_size = 1 << window_size;
-        let mut table = vec![aux.clone()];
-        for i in 0..(table_size - 1) {
-            table.push(self.add_incomplete(stack, &table[i], point));
-        }
-        table
-    }
+    //     aux: &Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>,
+    //     point: &Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>,
+    //     window_size: usize,
+    // ) -> Vec<Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>> {
+    //     let table_size = 1 << window_size;
+    //     let mut table = vec![aux.clone()];
+    //     for i in 0..(table_size - 1) {
+    //         table.push(self.add_incomplete(stack, &table[i], point));
+    //     }
+    //     table
+    // }
 
     // pub fn msm_sliding_horizontal<
     //     Stack: SecondDegreeChip<C::Scalar> + FirstDegreeChip<C::Scalar> + SelectChip<C::Scalar>,

@@ -8,6 +8,7 @@ use circuitry::gates::range::in_place::RangeInPlaceGate;
 use circuitry::gates::range::RangeInPlace;
 use circuitry::gates::select::SelectGate;
 use circuitry::gates::vanilla::VanillaGate;
+use circuitry::gates::var_vanilla::VarVanillaGate;
 use circuitry::gates::vertical::VerticalGate;
 use circuitry::stack::Stack;
 use ff::Field;
@@ -70,20 +71,6 @@ fn make_stack<
     //     ch.copy_equal(stack, &p_assigned, &p_constant);
     //     ch.normal_equal(stack, &p_assigned, &p_constant);
     // }
-
-    //     * number of compositions: 186798
-    // * * zerosum n: 4 occurs: 34152
-    // * * zerosum n: 6 occurs: 101936
-    // * * zerosum n: 7 occurs: 50610
-    // * * zerosum n: 256 occurs: 100
-    // * * rows: 1128095
-
-    // * number of compositions: 192661
-    // * * zerosum n: 4 occurs: 35218
-    // * * zerosum n: 6 occurs: 105134
-    // * * zerosum n: 7 occurs: 52209
-    // * * zerosum n: 256 occurs: 100
-    // * * rows: 1162740
 
     // // add
     // {
@@ -177,7 +164,7 @@ struct TestConfig<
     const SUBLIMB_SIZE: usize,
 > {
     vertical_gate: VerticalGate<C::Scalar, R>,
-    vanilla_gate: VanillaGate<C::Scalar>,
+    vanilla_gate: VarVanillaGate<C::Scalar, 4>,
     select_gate: SelectGate<C::Scalar>,
     rns: Rns<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>,
 }
@@ -222,17 +209,16 @@ impl<
         let mut vertical_gate = VerticalGate::new(meta, range_gate, scale, advice, acc);
         vertical_gate.configure_composition_gate(meta);
 
-        let vanilla_gate = VanillaGate::new(meta);
+        let vanilla_gate = VarVanillaGate::new(meta);
         vanilla_gate.configure(meta);
         let shared_columns = vanilla_gate.advice_colums();
-        let one_extra_for_selection = meta.advice_column();
 
         let select_gate = SelectGate::new(
             meta,
             shared_columns[0],
             shared_columns[1],
             shared_columns[2],
-            one_extra_for_selection,
+            shared_columns[3],
         );
         select_gate.configure(meta);
 
@@ -331,7 +317,7 @@ fn test_ecc_x() {
         90, // limb size
         5,  // number of sublimbs
         18, // sublimb size
-    >(20, 100, 4);
+    >(21, 100, 4);
 
     // run_test::<
     //     EqAffine,

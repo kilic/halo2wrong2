@@ -118,7 +118,6 @@ impl<F: PrimeField + Ord> Stack<F> {
     ) -> Result<(), Error> {
         println!("Layout first degree compositions");
         let e = std::mem::take(&mut self.first_degree_compositions);
-        println!("xxx {}", e.len());
         gate.layout(ly, e)?;
         Ok(())
     }

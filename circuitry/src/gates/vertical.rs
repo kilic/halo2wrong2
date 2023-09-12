@@ -132,6 +132,7 @@ impl<F: PrimeField + Ord, R: RangeInPlace<F, 1>> GateLayout<F, Vec<Selection<F>>
         #[cfg(feature = "info")]
         {
             println!("---");
+            println!("vertical gate, selects");
             println!("* number of selects: {}", e.len());
         }
 
@@ -195,6 +196,7 @@ impl<F: PrimeField + Ord, R: RangeInPlace<F, 1>> GateLayout<F, Vec<FirstDegreeCo
             }
 
             println!("---");
+            println!("vertical gate, first degree compositions");
             println!("* number of compositions: {}", e.len());
             for (n_terms, count) in n {
                 println!("* * zerosum n: {n_terms} occurs: {count}");

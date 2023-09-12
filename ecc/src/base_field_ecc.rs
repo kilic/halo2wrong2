@@ -297,6 +297,7 @@ impl<
 
         point: &Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>,
     ) -> Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE> {
+        // lambda = (3 * a_x^2) / 2 * a_y
         let x_0_square = &self.ch.square(stack, &point.x);
         let numer = &self.ch.mul3(stack, x_0_square);
         let denom = &self.ch.mul2(stack, &point.y);
@@ -310,7 +311,6 @@ impl<
         let y_neg = &self.ch.neg(stack, &point.y);
         let y = &self.ch.mul_add(stack, lambda, t, &y_neg);
 
-        // lambda = (3 * a_x^2) / 2 * a_y
         // let denom = &self.ch.mul2(stack, &point.y);
         // let lambda = &self
         //     .ch
@@ -389,9 +389,7 @@ impl<
         Point::new(&state.x_cur, &y_cur)
     }
 
-    // pub fn ladder_incomplete<
-    //     Stack: SecondDegreeChip<C::Scalar> + FirstDegreeChip<C::Scalar>,
-    // >(
+    // pub fn ladder_incomplete<Stack: SecondDegreeChip<C::Scalar> + FirstDegreeChip<C::Scalar>>(
     //     &self,
     //     stack: &mut Stack,
 
@@ -425,3 +423,20 @@ impl<
     //     Point::new(x_4, y_4)
     // }
 }
+
+// * * zerosum n: 2 nn: 1 occurs: 2281 * 1
+// * * zerosum n: 2 nn: 2 occurs: 6119 * 2
+// * * zerosum n: 3 nn: 1 occurs: 11284 * 2
+// * * zerosum n: 3 nn: 2 occurs: 6119 * 2
+// * * zerosum n: 4 nn: 1 occurs: 9003 * 2
+// * * zerosum n: 5 nn: 1 occurs: 737 * 2
+// * * zerosum n: 5 nn: 2 occurs: 1544 * 3
+// * * zerosum n: 5 nn: 4 occurs: 6119 *4
+// * * zerosum n: 6 nn: 1 occurs: 7561 * 3
+// * * zerosum n: 6 nn: 2 occurs: 2179 * 3
+// * * zerosum n: 6 nn: 3 occurs: 1544 * 4
+// * * zerosum n: 6 nn: 6 occurs: 6119 * 6
+// * * zerosum n: 7 nn: 2 occurs: 7561 * 4
+// * * zerosum n: 7 nn: 3 occurs: 1442 * 4
+
+// 2281 * 1+ 6119 * 2+ 11284 * 2+ 6119 * 2+ 9003 * 2+ 737 * 2+ 1544 * 3+ 6119 *4 + 7561 * 3+ 2179 * 3+ 1544 * 4+ 6119 * 6+ 7561 * 4+ 1442 * 4+
