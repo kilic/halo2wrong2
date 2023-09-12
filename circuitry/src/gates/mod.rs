@@ -9,6 +9,7 @@ use crate::LayoutCtx;
 // pub mod crt256;
 pub mod range;
 pub mod select;
+pub mod var_vanilla;
 pub mod vanilla;
 pub mod vertical;
 

@@ -74,6 +74,7 @@ impl<F: PrimeField + Ord> GateLayout<F, Vec<Selection<F>>> for SelectGate<F> {
         #[cfg(feature = "info")]
         {
             println!("---");
+            println!("select gate");
             println!("* number of selects: {}", e.len());
         }
 

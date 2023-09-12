@@ -1,5 +1,6 @@
 use super::GateLayout;
 use crate::{
+    chip::second_degree,
     enforcement::{FirstDegreeComposition, SecondDegreeComposition, Selection},
     witness::{Composable, Scaled, SecondDegreeScaled, Term, Witness},
     LayoutCtx, RegionCtx,
@@ -12,44 +13,40 @@ use halo2_pse::{
 };
 use std::{collections::BTreeMap, marker::PhantomData};
 
+pub enum ColumnID {
+    A,
+    B,
+    C,
+}
+
 #[derive(Clone, Debug)]
-pub struct VanillaGate<F: PrimeField> {
+pub struct VarVanillaGate<F: PrimeField, const W: usize> {
     pub(crate) selector: Selector,
     pub(crate) s_mul: Column<Fixed>,
+    pub(crate) advice: [Column<Advice>; W],
+    pub(crate) fixed: [Column<Fixed>; W],
+    pub(crate) s_next: Column<Fixed>,
+    pub(crate) constant: Column<Fixed>,
 
-    pub(crate) a: Column<Advice>,
-    pub(crate) b: Column<Advice>,
-    pub(crate) c: Column<Advice>,
-
-    pub(crate) sa: Column<Fixed>,
-    pub(crate) sb: Column<Fixed>,
-    pub(crate) sc: Column<Fixed>,
-    pub(crate) s_next: Option<Column<Fixed>>,
-    pub(crate) constant: Option<Column<Fixed>>,
     // pub(crate) _public_inputs: Option<Column<Instance>>,
     pub(crate) _marker: PhantomData<F>,
 }
 
-impl<F: PrimeField> VanillaGate<F> {
-    pub fn advice_colums(&self) -> [Column<Advice>; 3] {
-        [self.a, self.b, self.c]
+impl<F: PrimeField, const W: usize> VarVanillaGate<F, W> {
+    pub fn advice_colums(&self) -> [Column<Advice>; W] {
+        self.advice
     }
 
-    pub fn fixed_columns(&self) -> [Column<Fixed>; 3] {
-        [self.sa, self.sb, self.sc]
+    pub fn fixed_columns(&self) -> [Column<Fixed>; W] {
+        self.fixed
     }
 
     pub fn constant(&self) -> Column<Fixed> {
-        self.constant.unwrap()
+        self.constant
     }
 
     fn column(&self, idx: usize) -> (Column<Fixed>, Column<Advice>) {
-        match idx {
-            0 => (self.sa, self.a),
-            1 => (self.sb, self.b),
-            2 => (self.sc, self.c),
-            _ => panic!("invalid column index"),
-        }
+        (self.fixed[idx], self.advice[idx])
     }
 
     fn enable(&self, ctx: &mut RegionCtx<'_, '_, F>) -> Result<(), Error> {
@@ -67,27 +64,15 @@ impl<F: PrimeField> VanillaGate<F> {
     }
 
     fn enable_scaled_next(&self, ctx: &mut RegionCtx<'_, '_, F>, factor: F) -> Result<(), Error> {
-        if let Some(column) = self.s_next {
-            ctx.fixed(column, factor).map(|_| ())
-        } else {
-            Ok(())
-        }
+        ctx.fixed(self.s_next, factor).map(|_| ())
     }
 
     fn disable_next(&self, ctx: &mut RegionCtx<'_, '_, F>) -> Result<(), Error> {
-        if let Some(column) = self.s_next {
-            ctx.fixed(column, F::ZERO).map(|_| ())
-        } else {
-            Ok(())
-        }
+        ctx.fixed(self.s_next, F::ZERO).map(|_| ())
     }
 
     fn set_constant(&self, ctx: &mut RegionCtx<'_, '_, F>, constant: F) -> Result<(), Error> {
-        if let Some(column) = self.constant {
-            ctx.fixed(column, constant).map(|_| ())
-        } else {
-            Ok(())
-        }
+        ctx.fixed(self.constant, constant).map(|_| ())
     }
 
     fn assign(
@@ -131,9 +116,11 @@ impl<F: PrimeField> VanillaGate<F> {
         self.disable_constant(ctx)?;
         self.disable_mul(ctx)?;
         self.disable_next(ctx)?;
-        ctx.empty(self.sa.into())?;
-        ctx.empty(self.sb.into())?;
-        ctx.empty(self.sc.into())?;
+        let _ = self
+            .fixed
+            .iter()
+            .map(|column| ctx.fixed(*column, F::ZERO))
+            .collect::<Result<Vec<_>, _>>()?;
         Ok(())
     }
 
@@ -144,80 +131,94 @@ impl<F: PrimeField> VanillaGate<F> {
         Ok(())
     }
 
-    fn empty_cell(&self, ctx: &mut RegionCtx<'_, '_, F>, idx: usize) -> Result<(), Error> {
-        let (fixed, advice) = self.column(idx);
+    fn empty_cell(&self, ctx: &mut RegionCtx<'_, '_, F>, column: usize) -> Result<(), Error> {
+        let (fixed, advice) = self.column(column);
         ctx.fixed(fixed, F::ZERO)?;
         ctx.advice(advice, Value::known(F::ZERO))?;
         Ok(())
     }
 
     fn no_witness(&self, ctx: &mut RegionCtx<'_, '_, F>) -> Result<(), Error> {
-        for c in 0..3 {
-            self.empty_cell(ctx, c)?;
+        for i in 0..W {
+            self.empty_cell(ctx, i)?;
         }
         Ok(())
     }
 }
 
-impl<F: PrimeField + Ord> VanillaGate<F> {
+impl<F: PrimeField + Ord, const W: usize> VarVanillaGate<F, W> {
     pub fn new(meta: &mut ConstraintSystem<F>) -> Self {
         let selector = meta.selector();
-        let a = meta.advice_column();
-        let b = meta.advice_column();
-        let c = meta.advice_column();
-        let sa = meta.fixed_column();
-        let sb = meta.fixed_column();
-        let sc = meta.fixed_column();
+
+        let advice = (0..W)
+            .map(|_| meta.advice_column())
+            .collect::<Vec<_>>()
+            .try_into()
+            .unwrap();
+        let fixed = (0..W)
+            .map(|_| meta.fixed_column())
+            .collect::<Vec<_>>()
+            .try_into()
+            .unwrap();
+
         let s_mul = meta.fixed_column();
         let (s_next, constant) = (meta.fixed_column(), meta.fixed_column());
         // let public_inputs = meta.instance_column();
 
         Self {
             selector,
-            a,
-            b,
-            c,
-            sa,
-            sb,
-            sc,
+            advice,
+            fixed,
             s_mul,
-            s_next: Some(s_next),
-            constant: Some(constant),
+            s_next,
+            constant,
             _marker: PhantomData,
         }
     }
 
     pub fn configure(&self, meta: &mut ConstraintSystem<F>) {
-        meta.enable_equality(self.a);
-        meta.enable_equality(self.b);
-        meta.enable_equality(self.c);
+        let _ = self
+            .advice
+            .iter()
+            .map(|column| meta.enable_equality(*column))
+            .collect::<Vec<_>>();
+
         meta.create_gate("vanilla gate", |meta| {
-            let a = meta.query_advice(self.a, Rotation::cur());
-            let b = meta.query_advice(self.b, Rotation::cur());
-            let next = meta.query_advice(self.c, Rotation::next());
-            let c = meta.query_advice(self.c, Rotation::cur());
-            let sa = meta.query_fixed(self.sa, Rotation::cur());
-            let sb = meta.query_fixed(self.sb, Rotation::cur());
-            let sc = meta.query_fixed(self.sc, Rotation::cur());
+            let advices = self
+                .advice
+                .iter()
+                .map(|column| meta.query_advice(*column, Rotation::cur()))
+                .collect::<Vec<_>>();
+            let fixed = self
+                .fixed
+                .iter()
+                .map(|column| meta.query_fixed(*column, Rotation::cur()))
+                .collect::<Vec<_>>();
+
             let s_mul = meta.query_fixed(self.s_mul, Rotation::cur());
 
-            let mut expression = a.clone() * sa + b.clone() * sb + c * sc + a * b * s_mul;
+            let mul_expression = s_mul * advices[0].clone() * advices[1].clone();
+            let add_xpression = advices.iter().skip(1).zip(fixed.iter().skip(1)).fold(
+                advices[0].clone() * fixed[0].clone(),
+                |acc, (advice, fixed)| acc + advice.clone() * fixed.clone(),
+            );
 
-            if let Some(constant) = self.constant {
-                expression = expression + meta.query_fixed(constant, Rotation::cur());
-            }
-            if let Some(s_next) = self.s_next {
-                let s_next = meta.query_fixed(s_next, Rotation::cur());
-                expression = expression + s_next * next;
-            }
+            let s_next = meta.query_fixed(self.s_next, Rotation::cur());
+            let next_advice = meta.query_advice(*self.advice.last().unwrap(), Rotation::next());
+            let next_expression = s_next * next_advice;
 
-            let selector = meta.query_selector(self.selector);
-            Constraints::with_selector(selector, vec![expression])
+            let constant_expression = meta.query_fixed(self.constant, Rotation::cur());
+
+            let expression = mul_expression + add_xpression + next_expression + constant_expression;
+
+            Constraints::with_selector(meta.query_selector(self.selector), vec![expression])
         });
     }
 }
 
-impl<F: PrimeField + Ord> GateLayout<F, Vec<FirstDegreeComposition<F>>> for VanillaGate<F> {
+impl<F: PrimeField + Ord, const W: usize> GateLayout<F, Vec<FirstDegreeComposition<F>>>
+    for VarVanillaGate<F, W>
+{
     fn layout<L: Layouter<F>>(
         &self,
         ly_ctx: &mut LayoutCtx<F, L>,
@@ -235,7 +236,7 @@ impl<F: PrimeField + Ord> GateLayout<F, Vec<FirstDegreeComposition<F>>> for Vani
             }
 
             println!("---");
-            println!("vanilla gate, first degree composition");
+            println!("var vanilla gate, first degree composition");
             println!("* number of compositions: {}", e.len());
             for (n_terms, count) in n_first {
                 println!("* * zerosum n: {n_terms} occurs: {count}");
@@ -267,7 +268,9 @@ impl<F: PrimeField + Ord> GateLayout<F, Vec<FirstDegreeComposition<F>>> for Vani
     }
 }
 
-impl<F: PrimeField + Ord> GateLayout<F, Vec<SecondDegreeComposition<F>>> for VanillaGate<F> {
+impl<F: PrimeField + Ord, const W: usize> GateLayout<F, Vec<SecondDegreeComposition<F>>>
+    for VarVanillaGate<F, W>
+{
     fn layout<L: Layouter<F>>(
         &self,
         ly_ctx: &mut LayoutCtx<F, L>,
@@ -277,7 +280,7 @@ impl<F: PrimeField + Ord> GateLayout<F, Vec<SecondDegreeComposition<F>>> for Van
         {
             let mut n_second: BTreeMap<(usize, usize), usize> = BTreeMap::new();
             println!("---");
-            println!("vanilla gate, second degree composition");
+            println!("var vanilla gate, second degree composition");
             println!("* number of compositions: {}", e.len());
 
             for op in e.iter() {
@@ -336,7 +339,9 @@ impl<F: PrimeField + Ord> GateLayout<F, Vec<SecondDegreeComposition<F>>> for Van
     }
 }
 
-impl<F: PrimeField + Ord> GateLayout<F, Vec<Selection<F>>> for VanillaGate<F> {
+impl<F: PrimeField + Ord, const W: usize> GateLayout<F, Vec<Selection<F>>>
+    for VarVanillaGate<F, W>
+{
     fn layout<L: Layouter<F>>(
         &self,
         ly_ctx: &mut LayoutCtx<F, L>,
@@ -345,7 +350,7 @@ impl<F: PrimeField + Ord> GateLayout<F, Vec<Selection<F>>> for VanillaGate<F> {
         #[cfg(feature = "info")]
         {
             println!("---");
-            println!("vanilla gate, selection");
+            println!("var vanilla gate, selection");
             println!("* number of selects: {}", e.len());
         }
 
@@ -371,7 +376,7 @@ impl<F: PrimeField + Ord> GateLayout<F, Vec<Selection<F>>> for VanillaGate<F> {
     }
 }
 
-impl<F: PrimeField> VanillaGate<F> {
+impl<F: PrimeField, const W: usize> VarVanillaGate<F, W> {
     fn select(
         &self,
         ctx: &mut RegionCtx<'_, '_, F>,
@@ -387,9 +392,12 @@ impl<F: PrimeField> VanillaGate<F> {
         self.enable_scaled_mul(ctx, -F::ONE)?;
         self.enable_next(ctx)?;
         self.disable_constant(ctx)?;
-        Self::assign(self, ctx, 0, &Scaled::add(w1))?;
-        Self::assign(self, ctx, 1, &Scaled::mul(cond))?;
-        Self::assign(self, ctx, 2, &Scaled::sub(selected))?;
+        self.assign(ctx, 0, &Scaled::add(w1))?;
+        self.assign(ctx, 1, &Scaled::mul(cond))?;
+        for idx in 2..W - 1 {
+            self.empty_cell(ctx, idx)?;
+        }
+        self.assign(ctx, W - 1, &Scaled::sub(selected))?;
         self.next(ctx)?;
         // * second row
         // c * w0 = -tmp
@@ -399,28 +407,34 @@ impl<F: PrimeField> VanillaGate<F> {
         self.enable_mul(ctx)?;
         self.disable_next(ctx)?;
         self.disable_constant(ctx)?;
-        Self::assign(self, ctx, 0, &Scaled::mul(w0))?;
-        Self::assign(self, ctx, 1, &Scaled::mul(cond))?;
-        Self::assign(self, ctx, 2, &c_w0)?;
+        self.assign(ctx, 0, &Scaled::mul(w0))?;
+        self.assign(ctx, 1, &Scaled::mul(cond))?;
+        for idx in 2..W - 1 {
+            self.empty_cell(ctx, idx)?;
+        }
+        self.assign(ctx, W - 1, &c_w0)?;
         self.next(ctx)
     }
 
-    fn or(
-        &self,
-        ctx: &mut RegionCtx<'_, '_, F>,
-        w0: &Witness<F>,
-        w1: &Witness<F>,
-        result: &Witness<F>,
-    ) -> Result<(), Error> {
-        self.disable_next(ctx)?;
-        self.disable_constant(ctx)?;
-        self.enable_mul(ctx)?;
-        Self::assign(self, ctx, 0, &Scaled::sub(w0))?;
-        Self::assign(self, ctx, 1, &Scaled::sub(w1))?;
-        Self::assign(self, ctx, 2, &Scaled::add(result))?;
-        self.next(ctx)?;
-        Ok(())
-    }
+    // fn or(
+    //     &self,
+    //     ctx: &mut RegionCtx<'_, '_, F>,
+    //     w0: &Witness<F>,
+    //     w1: &Witness<F>,
+    //     result: &Witness<F>,
+    // ) -> Result<(), Error> {
+    //     self.disable_next(ctx)?;
+    //     self.disable_constant(ctx)?;
+    //     self.enable_mul(ctx)?;
+    //     self.assign(ctx, 0, &Scaled::sub(w0))?;
+    //     self.assign(ctx, 1, &Scaled::sub(w1))?;
+    //     for idx in 2..W - 1 {
+    //         self.empty_cell(ctx, idx)?;
+    //     }
+    //     self.assign(ctx, W - 1, &Scaled::add(result))?;
+    //     self.next(ctx)?;
+    //     Ok(())
+    // }
 
     fn zero_sum(
         &self,
@@ -432,9 +446,11 @@ impl<F: PrimeField> VanillaGate<F> {
         let corner = terms.pop().unwrap();
 
         if terms.is_empty() {
-            Self::assign(self, ctx, 0, &corner)?;
-            self.empty_cell(ctx, 1)?;
-            self.empty_cell(ctx, 2)?;
+            self.assign(ctx, 0, &corner)?;
+
+            for idx in 1..W {
+                self.empty_cell(ctx, idx)?;
+            }
 
             self.set_constant(ctx, constant)?;
             self.disable_next(ctx)?;
@@ -443,16 +459,15 @@ impl<F: PrimeField> VanillaGate<F> {
             return Ok(());
         }
 
-        const CHUNK_SIZE: usize = 2;
+        let chunk_size: usize = W - 1;
 
-        let number_of_chunks = ((terms.len() as i32 - 1) / CHUNK_SIZE as i32) + 1;
+        let number_of_chunks = ((terms.len() as i32 - 1) / chunk_size as i32) + 1;
         let number_of_chunks = number_of_chunks as usize;
 
         let mut sum = corner.value();
 
-        for (i, chunk) in terms.chunks(CHUNK_SIZE).enumerate() {
+        for (i, chunk) in terms.chunks(chunk_size).enumerate() {
             let in_last_iter = i == number_of_chunks - 1;
-
             // shape the gate:
             // * first degree composition has no mul
             self.disable_mul(ctx)?;
@@ -467,13 +482,11 @@ impl<F: PrimeField> VanillaGate<F> {
             let constant = if i == 0 { constant } else { F::ZERO };
             self.set_constant(ctx, constant)?;
 
-            // terms
-            Self::assign(self, ctx, 0, &chunk[0])?;
-
-            if chunk.len() == CHUNK_SIZE {
-                Self::assign(self, ctx, 1, &chunk[1])?;
-            } else {
-                self.empty_cell(ctx, 1)?;
+            for (j, e) in chunk.iter().enumerate() {
+                self.assign(ctx, j, e)?;
+            }
+            for j in chunk.len()..chunk_size {
+                self.empty_cell(ctx, j)?;
             }
 
             // intermediate
@@ -482,10 +495,11 @@ impl<F: PrimeField> VanillaGate<F> {
             } else {
                 Witness::tmp(sum).into()
             };
-            Self::assign(self, ctx, 2, &t)?;
+            self.assign(ctx, chunk_size, &t)?;
 
             // update running sum
             sum = sum + Scaled::compose(chunk, constant);
+
             #[cfg(feature = "prover-sanity")]
             if in_last_iter {
                 sum.map(|sum| assert_eq!(sum, F::ZERO));
@@ -525,9 +539,12 @@ impl<F: PrimeField> VanillaGate<F> {
         );
 
         if second_degree_terms.is_empty() {
+            // TODO: consider disallowing such case
             return self.zero_sum(ctx, &first_degree_terms, constant);
         }
 
+        // use the first corner as the running sum
+        // and save one space of single term
         let corner = if let Some(term) = first_degree_terms.pop() {
             term
         } else {
@@ -540,46 +557,104 @@ impl<F: PrimeField> VanillaGate<F> {
                 F::ZERO,
             )
         };
-
         let mut sum = corner.value();
 
-        for (i, term) in second_degree_terms.iter().enumerate() {
+        // split simultaneus first degree term
+        let w_first_degree = W - 3;
+        let (first_degree_terms, first_degree_terms_rest) = if w_first_degree > 0 {
+            let offset = std::cmp::min(
+                w_first_degree * second_degree_terms.len(),
+                first_degree_terms.len(),
+            );
+            first_degree_terms.split_at(offset)
+        } else {
+            (&[] as &[Scaled<_>], &first_degree_terms[..])
+        };
+
+        // prepare first degree terms for the zipped iteration
+        let first_degree_terms = if w_first_degree == 0 {
+            std::iter::repeat(vec![])
+                .take(second_degree_terms.len())
+                .collect::<Vec<_>>()
+        } else {
+            first_degree_terms
+                .chunks(w_first_degree)
+                .map(|chunk| {
+                    // Some(
+                    chunk
+                        .iter()
+                        .map(|e| Some(e))
+                        .chain(std::iter::repeat(None))
+                        .take(w_first_degree)
+                        .collect::<Vec<_>>()
+                    // )
+                })
+                .chain(std::iter::repeat(vec![None; w_first_degree]))
+                .take(second_degree_terms.len())
+                .collect::<Vec<_>>()
+        };
+
+        for (i, (second_degree_term, first_degree_terms)) in second_degree_terms
+            .iter()
+            .zip(first_degree_terms.iter())
+            .enumerate()
+        {
             let in_last_iter = i == second_degree_terms.len() - 1;
 
             // shape the gate:
-            // * open mul gate
-            self.enable_scaled_mul(ctx, term.factor)?;
-            // * decide next gate
+            // * * open mul gate
+            self.enable_scaled_mul(ctx, second_degree_term.factor)?;
+            // * * decide next gate
             if in_last_iter {
-                if !first_degree_terms.is_empty() {
+                if !first_degree_terms_rest.is_empty() {
+                    // if there is first degree terms left running sum will continue
                     self.enable_scaled_next(ctx, -F::ONE)?;
                 } else {
+                    // it should mean we are exhausted of terms
                     self.disable_next(ctx)?;
                 }
             } else {
+                // not the last term then continue adding up
                 self.enable_scaled_next(ctx, -F::ONE)?;
             }
 
-            // add constant in first iter
+            // feed constant in the first iter
             let constant = if i == 0 { constant } else { F::ZERO };
             self.set_constant(ctx, constant)?;
 
             // assign second degree term
-            Self::assign(self, ctx, 0, &Scaled::mul(&term.w0))?;
-            Self::assign(self, ctx, 1, &Scaled::mul(&term.w1))?;
+            self.assign(ctx, 0, &Scaled::mul(&second_degree_term.w0))?;
+            self.assign(ctx, 1, &Scaled::mul(&second_degree_term.w1))?;
 
-            // intermediate
+            // assign running sum before update
             let t = if i == 0 {
                 corner
             } else {
                 Witness::tmp(sum).into()
             };
-            Self::assign(self, ctx, 2, &t)?;
+            self.assign(ctx, W - 1, &t)?;
 
             // update running sum
-            sum = sum + term.value().map(|term| term + constant);
+            sum = sum + second_degree_term.value().map(|term| term + constant);
+
+            assert_eq!(first_degree_terms.len(), W - 3);
+            for (idx, first_degree_term) in first_degree_terms.iter().enumerate() {
+                let idx = idx + 2;
+                match first_degree_term {
+                    Some(term) => {
+                        self.assign(ctx, idx, term)?;
+                        // update running sum
+                        sum = sum + term.value();
+                    }
+                    // partially filled
+                    None => {
+                        self.empty_cell(ctx, idx)?;
+                    }
+                }
+            }
+
             #[cfg(feature = "prover-sanity")]
-            if in_last_iter && first_degree_terms.is_empty() {
+            if in_last_iter && first_degree_terms_rest.is_empty() {
                 sum.map(|sum| assert_eq!(sum, F::ZERO));
             }
 
@@ -587,11 +662,12 @@ impl<F: PrimeField> VanillaGate<F> {
             self.next(ctx)?;
         }
 
-        // constraint the rest of the first degree terms
-        if !first_degree_terms.is_empty() {
-            first_degree_terms.push(Witness::tmp(sum).into());
-            self.zero_sum(ctx, &first_degree_terms, F::ZERO)?;
+        let mut first_degree_terms_rest = first_degree_terms_rest.to_vec();
+        if !first_degree_terms_rest.is_empty() {
+            first_degree_terms_rest.push(Witness::tmp(sum).into());
+            self.zero_sum(ctx, &first_degree_terms_rest, F::ZERO)?;
         }
+
         Ok(())
     }
 }

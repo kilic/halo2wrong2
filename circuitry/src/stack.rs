@@ -116,8 +116,9 @@ impl<F: PrimeField + Ord> Stack<F> {
         ly: &mut LayoutCtx<F, L>,
         gate: &Gate,
     ) -> Result<(), Error> {
-        println!("layout first degree compositions");
+        println!("Layout first degree compositions");
         let e = std::mem::take(&mut self.first_degree_compositions);
+        println!("xxx {}", e.len());
         gate.layout(ly, e)?;
         Ok(())
     }
@@ -130,7 +131,7 @@ impl<F: PrimeField + Ord> Stack<F> {
         ly: &mut LayoutCtx<F, L>,
         gate: &Gate,
     ) -> Result<(), Error> {
-        println!("layout range compositions");
+        println!("Layout range compositions");
         let e = std::mem::take(&mut self.range_compositions);
         gate.layout(ly, e)?;
         Ok(())
@@ -144,7 +145,7 @@ impl<F: PrimeField + Ord> Stack<F> {
         ly: &mut LayoutCtx<F, L>,
         gate: &Gate,
     ) -> Result<(), Error> {
-        println!("layout simple composition (ternaries with a constant)");
+        println!("Layout simple composition (ternaries with a constant)");
         let e = std::mem::take(&mut self.first_degree_ternary_compositions);
         gate.layout(ly, e)?;
         Ok(())
@@ -159,7 +160,7 @@ impl<F: PrimeField + Ord> Stack<F> {
         ly: &mut LayoutCtx<F, L>,
         gate: &Gate,
     ) -> Result<(), Error> {
-        println!("layout simple composition no constant");
+        println!("Layout simple composition no constant");
         let e = std::mem::take(&mut self.first_degree_ternary_compositions);
         let e: Vec<_> = e.iter().filter(|e| !e.has_constant()).cloned().collect();
         gate.layout(ly, e)?;
@@ -174,7 +175,7 @@ impl<F: PrimeField + Ord> Stack<F> {
         ly: &mut LayoutCtx<F, L>,
         gate: &Gate,
     ) -> Result<(), Error> {
-        println!("layout second degree composition");
+        println!("Layout second degree composition");
         let e = std::mem::take(&mut self.second_degree_compositions);
         gate.layout(ly, e)?;
         Ok(())
@@ -185,7 +186,7 @@ impl<F: PrimeField + Ord> Stack<F> {
         ly: &mut LayoutCtx<F, L>,
         gate: &Gate,
     ) -> Result<(), Error> {
-        println!("layout selections");
+        println!("Layout selections");
         let e = std::mem::take(&mut self.selections);
         gate.layout(ly, e)?;
         Ok(())
@@ -196,7 +197,7 @@ impl<F: PrimeField + Ord> Stack<F> {
         ly: &mut LayoutCtx<F, L>,
         gate: &Gate,
     ) -> Result<(), Error> {
-        println!("layout range tables");
+        println!("Layout range tables");
         let mut tables: Vec<_> = self.range_tables.iter().copied().collect();
         tables.sort();
         #[cfg(feature = "synth-sanity")]

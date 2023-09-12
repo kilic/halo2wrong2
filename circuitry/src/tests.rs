@@ -32,7 +32,6 @@ use crate::{
         },
         vertical::VerticalGate,
     },
-    stack,
     witness::Composable,
     LayoutCtx,
 };
@@ -54,12 +53,12 @@ pub fn rand_value_in_range<F: PrimeField>(bit_size: usize) -> Value<F> {
 }
 
 impl<F: PrimeField + Ord> Stack<F> {
-    pub(crate) fn assign_witness(&mut self, w: &Witness<F>) {
+    pub(crate) fn _assign_witness(&mut self, w: &Witness<F>) {
         let e = FirstDegreeComposition::new(vec![w.add(), w.sub()], F::ZERO);
         self.first_degree_ternary_compositions.push(e);
     }
 
-    pub(crate) fn rand_witness(&mut self) -> Witness<F> {
+    pub(crate) fn _rand_witness(&mut self) -> Witness<F> {
         let value = rand_value();
         self.new_witness(value)
     }
@@ -69,9 +68,9 @@ impl<F: PrimeField + Ord> Stack<F> {
         self.assign(value)
     }
 
-    pub(crate) fn assign_rand_witness_in_range(&mut self, bit_size: usize) -> Witness<F> {
+    pub(crate) fn _assign_rand_witness_in_range(&mut self, bit_size: usize) -> Witness<F> {
         let w = self.rand_witness_in_range(bit_size);
-        self.assign_witness(&w);
+        self._assign_witness(&w);
         w
     }
 
@@ -85,11 +84,6 @@ impl<F: PrimeField + Ord> Stack<F> {
         let value = rand_value_in_range(bit_size);
         self.new_witness_in_range(value, bit_size)
     }
-
-    // pub(crate) fn _max_witness_in_range(&mut self, bit_size: usize) -> Witness<F> {
-    //     let value = _max_value_in_range(bit_size);
-    //     self.new_witness_in_range(value, bit_size)
-    // }
 
     pub(crate) fn rand_scaled(&mut self) -> Scaled<F> {
         let witness = self.new_witness(v!(F::random(OsRng)));
@@ -105,48 +99,111 @@ impl<F: PrimeField + Ord> Stack<F> {
     }
 }
 
-mod test_first_degree_composition {
+mod test_composition {
 
-    use crate::gates::{range::in_place_sparse::RangeInPlaceSpaseGate, vanilla::VanillaGate};
+    use crate::{
+        gates::{
+            range::in_place_sparse::RangeInPlaceSpaseGate, vanilla::VanillaGate,
+            var_vanilla::VarVanillaGate,
+        },
+        utils::modulus,
+        witness::Term,
+    };
 
     use super::*;
 
-    fn make_stack<'a, F: PrimeField + Ord, const LIMB_SIZE: usize>() -> Stack<F> {
-        let mut stack: Stack<F> = Stack::default();
+    fn make_stack_first_degree<'a, F: PrimeField + Ord, const LIMB_SIZE: usize>(
+        stack: &mut Stack<F>,
+        use_constants: bool,
+    ) {
+        let rand = || F::random(OsRng);
 
         let w0 = rand_value();
         let w0 = &stack.assign(w0);
         stack.equal(w0, w0);
         // combination first degree
-        for i in 1..10 {
+        for n_terms in 1..10 {
             // compose
-            for _ in 0..10 {
-                let terms: Vec<Scaled<F>> = (0..i)
-                    .map(|_| stack.rand_witness_in_range(LIMB_SIZE).into())
-                    .collect();
 
-                let expected = Scaled::compose(&terms[..], F::ZERO);
-                let result = &stack.compose(&terms[..], F::ZERO);
-                result
-                    .value()
-                    .zip(expected)
-                    .map(|(e0, e1)| assert_eq!(e0, e1));
-                let expected = &stack.assign(expected);
-                stack.equal(expected, result);
-            }
+            let terms: Vec<Scaled<F>> = (0..n_terms)
+                .map(|_| stack.rand_witness_in_range(LIMB_SIZE).into())
+                .collect();
+            let constant = if use_constants { rand() } else { F::ZERO };
 
-            for _ in 0..10 {
+            let expected = Scaled::compose(&terms[..], constant);
+            let result = &stack.compose(&terms[..], constant);
+            result
+                .value()
+                .zip(expected)
+                .map(|(e0, e1)| assert_eq!(e0, e1));
+            let expected = &stack.assign(expected);
+            stack.equal(expected, result);
+
+            // zero sum
+
+            let mut terms: Vec<Scaled<F>> = (0..n_terms).map(|_| stack.rand_scaled()).collect();
+            let constant = if use_constants { rand() } else { F::ZERO };
+
+            let result = Scaled::compose(&terms[..], constant);
+            let result: Scaled<_> = stack.new_witness(result).into();
+            terms.push(result.neg());
+            stack.zero_sum(&terms[..], constant);
+        }
+    }
+
+    fn make_stack_second_degree<'a, F: PrimeField + Ord>(stack: &mut Stack<F>) {
+        let rand = || F::random(OsRng);
+
+        // combination second degree
+        for n_first_degree in 0..20 {
+            for n_second_degree in 1..20 {
+                // compose
+                if n_first_degree + n_second_degree != 0 {
+                    let first_degree_terms: Vec<Term<F>> = (0..n_first_degree)
+                        .map(|_| stack.rand_scaled().into())
+                        .collect();
+                    let second_degree_terms: Vec<Term<F>> = (0..n_second_degree)
+                        .map(|_| stack.rand_second_degree_scaled().into())
+                        .collect();
+                    let terms: Vec<Term<F>> = first_degree_terms
+                        .iter()
+                        .chain(second_degree_terms.iter())
+                        .cloned()
+                        .collect();
+                    let constant = rand();
+                    let expect = Term::compose(&terms[..], constant);
+                    let expect = &stack.assign(expect);
+                    let result = stack.compose_second_degree(&terms[..], constant);
+                    result
+                        .value()
+                        .zip(expect.value())
+                        .map(|(e0, e1)| assert_eq!(e0, e1));
+                    stack.equal(&result, expect);
+                }
+
                 // zero sum
-                let mut terms: Vec<Scaled<F>> = (0..i).map(|_| stack.rand_scaled()).collect();
-                // let constant = rand();
-                let result = Scaled::compose(&terms[..], F::ZERO);
-                let result: Scaled<_> = stack.new_witness(result).into();
-                terms.push(result.neg());
-                stack.zero_sum(&terms[..], F::ZERO);
+                let first_degree_terms: Vec<Term<F>> = (0..n_first_degree)
+                    .map(|_| stack.rand_scaled().into())
+                    .collect();
+                let second_degree_terms: Vec<Term<F>> = (0..n_second_degree)
+                    .map(|_| stack.rand_second_degree_scaled().into())
+                    .collect();
+                let mut terms: Vec<Term<F>> = first_degree_terms
+                    .iter()
+                    .chain(second_degree_terms.iter())
+                    .cloned()
+                    .collect();
+                let constant = rand();
+                let sum: Value<F> = Term::compose(&terms[..], constant);
+
+                let w0 = stack.new_witness(sum);
+                let w1 = stack.new_witness(Value::known(F::ONE));
+                let factor = -F::ONE;
+                let sum = SecondDegreeScaled::new(&w0, &w1, factor).into();
+                terms.push(sum);
+                stack.zero_sum_second_degree(&terms[..], constant);
             }
         }
-
-        stack
     }
 
     #[derive(Clone)]
@@ -182,10 +239,13 @@ mod test_first_degree_composition {
         }
 
         fn synthesize(&self, cfg: Self::Config, ly: impl Layouter<F>) -> Result<(), Error> {
-            let mut stack = make_stack::<_, 8>();
+            let mut stack: Stack<F> = Stack::default();
+            make_stack_first_degree::<_, 8>(&mut stack, false);
             let ly = &mut LayoutCtx::new(ly);
+
             stack.layout_first_degree_compositions(ly, &cfg.vertical_gate)?;
             stack.layout_first_degree_ternary_compositions(ly, &cfg.vertical_gate)?;
+            stack.layout_range_compositions(ly, &cfg.vertical_gate)?;
             stack.layout_range_tables(ly, &cfg.vertical_gate)?;
             stack.apply_indirect_copies(ly)?;
             Ok(())
@@ -206,7 +266,7 @@ mod test_first_degree_composition {
     }
 
     #[test]
-    fn test_vertical_decomposition() {
+    fn test_vertical_composition() {
         run_test_vertical::<Fp, NoRangeInPlaceGate>();
         run_test_vertical::<Fp, RangeInPlaceGate<_, 1>>();
         run_test_vertical::<Fp, RangeInPlaceSpaseGate<_, 1, 8>>();
@@ -238,10 +298,15 @@ mod test_first_degree_composition {
         }
 
         fn synthesize(&self, cfg: Self::Config, ly: impl Layouter<F>) -> Result<(), Error> {
-            let mut stack = make_stack::<_, 8>();
+            let mut stack: Stack<F> = Stack::default();
+            make_stack_first_degree::<_, 8>(&mut stack, true);
+            make_stack_second_degree::<_>(&mut stack);
             let ly = &mut LayoutCtx::new(ly);
+
             stack.layout_first_degree_compositions(ly, &cfg.vanilla_gate)?;
             stack.layout_first_degree_ternary_compositions(ly, &cfg.vanilla_gate)?;
+            stack.layout_range_compositions(ly, &cfg.vanilla_gate)?;
+            stack.layout_second_degree_compositions(ly, &cfg.vanilla_gate)?;
             stack.apply_indirect_copies(ly)?;
             Ok(())
         }
@@ -261,14 +326,79 @@ mod test_first_degree_composition {
     }
 
     #[test]
-    fn test_vanilla_decomposition() {
+    fn test_vanilla_composition() {
         run_test_vanilla::<Fp>();
+    }
+
+    #[derive(Clone)]
+    struct TestConfigVarVanilla<F: PrimeField + Ord, const W: usize> {
+        vanilla_gate: VarVanillaGate<F, W>,
+    }
+
+    struct TestCircuitVarVanilla<F: PrimeField + Ord, const W: usize> {
+        _marker: PhantomData<F>,
+    }
+
+    impl<F: PrimeField + Ord, const W: usize> Circuit<F> for TestCircuitVarVanilla<F, W> {
+        type Config = TestConfigVarVanilla<F, W>;
+        type FloorPlanner = SimpleFloorPlanner;
+
+        fn configure(meta: &mut ConstraintSystem<F>) -> Self::Config {
+            let vanilla_gate = VarVanillaGate::new(meta);
+            vanilla_gate.configure(meta);
+            Self::Config { vanilla_gate }
+        }
+
+        fn without_witnesses(&self) -> Self {
+            Self {
+                _marker: PhantomData,
+            }
+        }
+
+        fn synthesize(&self, cfg: Self::Config, ly: impl Layouter<F>) -> Result<(), Error> {
+            let mut stack: Stack<F> = Stack::default();
+            make_stack_first_degree::<_, 8>(&mut stack, true);
+            make_stack_second_degree::<_>(&mut stack);
+            let ly = &mut LayoutCtx::new(ly);
+
+            stack.layout_first_degree_compositions(ly, &cfg.vanilla_gate)?;
+            stack.layout_first_degree_ternary_compositions(ly, &cfg.vanilla_gate)?;
+            stack.layout_range_compositions(ly, &cfg.vanilla_gate)?;
+            stack.layout_second_degree_compositions(ly, &cfg.vanilla_gate)?;
+            stack.apply_indirect_copies(ly)?;
+
+            Ok(())
+        }
+    }
+
+    fn run_test_var_vanilla<F: Ord + FromUniformBytes<64>, const W: usize>() {
+        const K: u32 = 17;
+        let circuit = TestCircuitVarVanilla::<F, W> {
+            _marker: PhantomData::<F>,
+        };
+        let public_inputs: Vec<Vec<F>> = vec![];
+        let prover = match MockProver::run(K, &circuit, public_inputs) {
+            Ok(prover) => prover,
+            Err(e) => panic!("{e:#?}"),
+        };
+        prover.assert_satisfied();
+    }
+
+    #[test]
+    fn test_var_vanilla_composition() {
+        run_test_var_vanilla::<Fp, 4>();
+        run_test_var_vanilla::<Fp, 5>();
+        run_test_var_vanilla::<Fp, 6>();
+        run_test_var_vanilla::<Fp, 7>();
     }
 }
 
-mod test_composition {
+mod test_arithmetic {
 
-    use crate::{chip::select::SelectChip, gates::vanilla::VanillaGate};
+    use crate::{
+        chip::select::SelectChip,
+        gates::{select::SelectGate, vanilla::VanillaGate, var_vanilla::VarVanillaGate},
+    };
 
     use super::*;
 
@@ -411,6 +541,7 @@ mod test_composition {
     #[derive(Clone)]
     struct TestConfigVanilla<F: PrimeField + Ord> {
         vanilla_gate: VanillaGate<F>,
+        select_gate: SelectGate<F>,
     }
 
     struct TestCircuitVanilla<F: PrimeField + Ord> {
@@ -423,9 +554,22 @@ mod test_composition {
 
         fn configure(meta: &mut ConstraintSystem<F>) -> Self::Config {
             let vanilla_gate = VanillaGate::new(meta);
+            let shared_advices = vanilla_gate.advice_colums();
+            let extra_advice = meta.advice_column();
+            let select_gate = SelectGate::new(
+                meta,
+                shared_advices[0],
+                shared_advices[1],
+                shared_advices[2],
+                extra_advice,
+            );
             vanilla_gate.configure(meta);
+            select_gate.configure(meta);
 
-            Self::Config { vanilla_gate }
+            Self::Config {
+                vanilla_gate,
+                select_gate,
+            }
         }
 
         fn without_witnesses(&self) -> Self {
@@ -439,8 +583,9 @@ mod test_composition {
             let ly = &mut LayoutCtx::new(ly);
             stack.layout_first_degree_compositions(ly, &cfg.vanilla_gate)?;
             stack.layout_first_degree_ternary_compositions(ly, &cfg.vanilla_gate)?;
+            stack.layout_range_compositions(ly, &cfg.vanilla_gate)?;
             stack.layout_second_degree_compositions(ly, &cfg.vanilla_gate)?;
-            stack.layout_selections(ly, &cfg.vanilla_gate)?;
+            stack.layout_selections(ly, &cfg.select_gate)?;
             stack.apply_indirect_copies(ly)?;
             Ok(())
         }
@@ -462,6 +607,67 @@ mod test_composition {
     #[test]
     fn test_arithmetic_vanilla() {
         run_test_vanilla::<Fp>();
+    }
+
+    #[derive(Clone)]
+    struct TestConfigVarVanilla<F: PrimeField + Ord, const W: usize> {
+        vanilla_gate: VarVanillaGate<F, W>,
+    }
+
+    struct TestCircuitVarVanilla<F: PrimeField + Ord, const W: usize> {
+        _marker: PhantomData<F>,
+    }
+
+    impl<F: PrimeField + Ord, const W: usize> Circuit<F> for TestCircuitVarVanilla<F, W> {
+        type Config = TestConfigVarVanilla<F, W>;
+        type FloorPlanner = SimpleFloorPlanner;
+
+        fn configure(meta: &mut ConstraintSystem<F>) -> Self::Config {
+            let vanilla_gate = VarVanillaGate::new(meta);
+            vanilla_gate.configure(meta);
+            Self::Config { vanilla_gate }
+        }
+
+        fn without_witnesses(&self) -> Self {
+            Self {
+                _marker: PhantomData,
+            }
+        }
+
+        fn synthesize(&self, cfg: Self::Config, ly: impl Layouter<F>) -> Result<(), Error> {
+            let mut stack = make_stack::<_>();
+            let ly = &mut LayoutCtx::new(ly);
+
+            stack.layout_first_degree_compositions(ly, &cfg.vanilla_gate)?;
+            stack.layout_first_degree_ternary_compositions(ly, &cfg.vanilla_gate)?;
+            stack.layout_range_compositions(ly, &cfg.vanilla_gate)?;
+            stack.layout_second_degree_compositions(ly, &cfg.vanilla_gate)?;
+            stack.layout_selections(ly, &cfg.vanilla_gate)?;
+            stack.apply_indirect_copies(ly)?;
+
+            Ok(())
+        }
+    }
+
+    fn run_test_var_vanilla<F: Ord + FromUniformBytes<64>, const W: usize>() {
+        const K: u32 = 17;
+        let circuit = TestCircuitVarVanilla::<F, W> {
+            _marker: PhantomData::<F>,
+        };
+        let public_inputs: Vec<Vec<F>> = vec![];
+        let prover = match MockProver::run(K, &circuit, public_inputs) {
+            Ok(prover) => prover,
+            Err(e) => panic!("{e:#?}"),
+        };
+        prover.assert_satisfied();
+    }
+
+    #[test]
+    fn test_arithmetic_var_vanilla() {
+        run_test_var_vanilla::<Fp, 4>();
+        run_test_var_vanilla::<Fp, 5>();
+        run_test_var_vanilla::<Fp, 6>();
+        run_test_var_vanilla::<Fp, 7>();
     }
 
     fn make_stack_simpler<F: PrimeField + Ord>() -> Stack<F> {
@@ -551,7 +757,7 @@ mod test_composition {
     }
 
     #[test]
-    fn test_arithmetic_vertical_x() {
+    fn test_arithmetic_vertical() {
         run_test_vertical::<Fp>();
     }
 }

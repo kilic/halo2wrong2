@@ -26,6 +26,9 @@ impl<F: PrimeField> FirstDegreeComposition<F> {
     }
 
     pub fn is_range_demoposition(&self) -> bool {
+        if self.terms.len() == 1 {
+            return self.terms[0].witness.range.is_some();
+        }
         let mut decision = true;
         for term in self.terms.iter().rev().skip(1) {
             decision = decision & term.witness.range.is_some()
