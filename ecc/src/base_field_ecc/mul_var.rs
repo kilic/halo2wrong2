@@ -5,7 +5,7 @@ use circuitry::{
 };
 use ff::{Field, PrimeField};
 use group::{Curve, Group};
-use halo2_pse::{circuit::Value, halo2curves::CurveAffine};
+use halo2::{circuit::Value, halo2curves::CurveAffine};
 use integer::integer::{Integer, UnassignedInteger};
 use num_bigint::BigUint;
 

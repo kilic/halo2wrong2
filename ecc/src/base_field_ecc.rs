@@ -5,7 +5,7 @@ use circuitry::{
     witness::Witness,
 };
 use ff::PrimeField;
-use halo2_pse::{circuit::Value, halo2curves::CurveAffine};
+use halo2::{circuit::Value, halo2curves::CurveAffine};
 use integer::{
     chip::IntegerChip,
     integer::{ConstantInteger, Integer, Range, UnassignedInteger},

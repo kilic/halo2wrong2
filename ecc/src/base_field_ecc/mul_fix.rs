@@ -1,5 +1,5 @@
 // use crate::Point;
-// use halo2_pse::halo2curves::CurveAffine;
+// use halo2::halo2curves::CurveAffine;
 
 // use super::BaseFieldEccChip;
 

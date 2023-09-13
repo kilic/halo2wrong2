@@ -3,7 +3,7 @@
 use std::marker::PhantomData;
 
 use ff::PrimeField;
-use halo2_pse::{
+use halo2::{
     circuit::Layouter,
     plonk::{Advice, Column, ConstraintSystem, Constraints, Error, Selector},
     poly::Rotation,

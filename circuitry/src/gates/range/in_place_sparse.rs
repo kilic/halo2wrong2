@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 
 use crate::{witness::Witness, LayoutCtx, RegionCtx};
 use ff::PrimeField;
-use halo2_pse::{
+use halo2::{
     circuit::Layouter,
     plonk::{Advice, Column, ConstraintSystem, Error, Fixed, TableColumn},
     poly::Rotation,

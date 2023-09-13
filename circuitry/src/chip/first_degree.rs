@@ -4,7 +4,7 @@ use crate::{
     witness::{Composable, Scaled, Witness},
 };
 use ff::PrimeField;
-use halo2_pse::circuit::Value;
+use halo2::circuit::Value;
 use num_integer::Integer;
 
 use super::Chip;

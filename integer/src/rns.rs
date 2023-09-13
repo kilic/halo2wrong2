@@ -3,7 +3,7 @@ use circuitry::utils::{
     big_to_fe, big_to_fe_unsafe, compose, decompose, fe_to_big, invert, modulus,
 };
 use ff::PrimeField;
-use halo2_pse::circuit::Value;
+use halo2::circuit::Value;
 use num_bigint::BigUint;
 use num_integer::Integer as _;
 use num_traits::{One, Zero};

@@ -7,7 +7,7 @@
 //     LayoutCtx, RegionCtx,
 // };
 // use ff::PrimeField;
-// use halo2_pse::{
+// use halo2::{
 //     circuit::Layouter,
 //     plonk::{Advice, Column, ConstraintSystem, Constraints, Error, Expression, Selector},
 //     poly::Rotation,

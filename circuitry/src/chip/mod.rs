@@ -1,6 +1,6 @@
 use crate::witness::Witness;
 use ff::PrimeField;
-use halo2_pse::circuit::Value;
+use halo2::circuit::Value;
 
 pub mod first_degree;
 pub mod second_degree;

@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use ff::PrimeField;
-use halo2_pse::{
+use halo2::{
     circuit::{Layouter, Value},
     plonk::{Advice, Column, ConstraintSystem, Error, TableColumn},
 };

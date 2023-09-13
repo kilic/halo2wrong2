@@ -1,6 +1,6 @@
 use circuitry::witness::Witness;
 use ff::PrimeField;
-use halo2_pse::{circuit::Value, halo2curves::CurveAffine};
+use halo2::{circuit::Value, halo2curves::CurveAffine};
 use integer::integer::{ConstantInteger, Integer};
 
 pub mod base_field_ecc;

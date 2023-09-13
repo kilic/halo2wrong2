@@ -11,7 +11,7 @@ use circuitry::{
     LayoutCtx,
 };
 use ff::{FromUniformBytes, PrimeField};
-use halo2_pse::{
+use halo2::{
     circuit::{Layouter, SimpleFloorPlanner, Value},
     dev::MockProver,
     plonk::{Circuit, ConstraintSystem, Error},
@@ -462,7 +462,7 @@ fn run_test<
 
 #[test]
 fn test_integer_y() {
-    use halo2_pse::halo2curves::pasta::{Fp as PastaFp, Fq as PastaFq};
+    use halo2::halo2curves::pasta::{Fp as PastaFp, Fq as PastaFq};
 
     run_test::<
         PastaFp,

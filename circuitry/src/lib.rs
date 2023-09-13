@@ -3,7 +3,7 @@ use halo2::{
     circuit::{AssignedCell, Layouter, Region, Value},
     plonk::{Advice, Any, Column, ConstraintSystem, Error, Fixed, Selector},
 };
-pub use halo2_pse as halo2;
+pub use halo2 as halo2;
 use std::{collections::BTreeMap, fmt::Debug};
 use witness::{Scaled, Witness};
 

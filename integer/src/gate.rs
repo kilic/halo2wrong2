@@ -6,7 +6,7 @@ use circuitry::{
     RegionCtx,
 };
 use ff::PrimeField;
-use halo2_pse::{
+use halo2::{
     plonk::{Advice, Column, ConstraintSystem, Constraints, Error, Expression, Selector},
     poly::Rotation,
 };

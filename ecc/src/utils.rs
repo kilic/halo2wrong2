@@ -1,8 +1,8 @@
 use ff::{Field, PrimeField};
-use halo2_pse::halo2curves::group::Group;
-use halo2_pse::halo2curves::CurveAffine;
+use halo2::halo2curves::group::Group;
+use halo2::halo2curves::CurveAffine;
 #[cfg(test)]
-use halo2_pse::halo2curves::CurveExt;
+use halo2::halo2curves::CurveExt;
 
 macro_rules! div_ceil {
     ($a:expr, $b:expr) => {

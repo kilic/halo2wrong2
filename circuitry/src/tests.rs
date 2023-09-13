@@ -1,7 +1,7 @@
 use crate::chip::first_degree::FirstDegreeChip;
 use crate::chip::second_degree::SecondDegreeChip;
 use ff::PrimeField;
-use halo2_pse::circuit::Value;
+use halo2::circuit::Value;
 use num_bigint::{BigUint, RandBigInt};
 use num_traits::One;
 use rand_core::OsRng;
@@ -17,7 +17,7 @@ use crate::{
 use std::marker::PhantomData;
 
 use ff::FromUniformBytes;
-use halo2_pse::{
+use halo2::{
     circuit::{Layouter, SimpleFloorPlanner},
     dev::MockProver,
     halo2curves::pasta::Fp,

@@ -1,5 +1,5 @@
 use ff::PrimeField;
-use halo2_pse::{
+use halo2::{
     circuit::Layouter,
     plonk::{ConstraintSystem, Error},
 };

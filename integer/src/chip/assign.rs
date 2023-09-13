@@ -6,7 +6,7 @@ use circuitry::{
     witness::{Scaled, Witness},
 };
 use ff::PrimeField;
-use halo2_pse::circuit::Value;
+use halo2::circuit::Value;
 use num_bigint::BigUint;
 use num_traits::One;
 

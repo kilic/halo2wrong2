@@ -15,15 +15,15 @@ use ff::Field;
 use ff::{FromUniformBytes, PrimeField};
 use group::{Curve, Group};
 
-use halo2_pse::halo2curves::bn256::{Bn256, Fq, Fr, G1Affine, G1};
-use halo2_pse::halo2curves::pairing::Engine;
-use halo2_pse::halo2curves::pasta::Fp;
-use halo2_pse::plonk::{create_proof, keygen_pk, keygen_vk, ProvingKey};
-use halo2_pse::poly::commitment::{Params, ParamsProver};
-use halo2_pse::poly::kzg::commitment::{KZGCommitmentScheme, ParamsKZG};
-use halo2_pse::poly::kzg::multiopen::ProverSHPLONK;
-use halo2_pse::transcript::{Blake2bWrite, Challenge255, TranscriptWriterBuffer};
-use halo2_pse::{
+use halo2::halo2curves::bn256::{Bn256, Fq, Fr, G1Affine, G1};
+use halo2::halo2curves::pairing::Engine;
+use halo2::halo2curves::pasta::Fp;
+use halo2::plonk::{create_proof, keygen_pk, keygen_vk, ProvingKey};
+use halo2::poly::commitment::{Params, ParamsProver};
+use halo2::poly::kzg::commitment::{KZGCommitmentScheme, ParamsKZG};
+use halo2::poly::kzg::multiopen::ProverSHPLONK;
+use halo2::transcript::{Blake2bWrite, Challenge255, TranscriptWriterBuffer};
+use halo2::{
     circuit::{Layouter, SimpleFloorPlanner, Value},
     dev::MockProver,
     halo2curves::CurveAffine,
@@ -300,7 +300,7 @@ fn run_test<
 
 #[test]
 fn test_ecc_x() {
-    use halo2_pse::halo2curves::pasta::{Eq, EqAffine};
+    use halo2::halo2curves::pasta::{Eq, EqAffine};
 
     // run_test::<
     //     EqAffine,
@@ -426,7 +426,7 @@ fn test_prover() {
         90, // limb size
         5,  // number of sublimbs
         18, // sublimb size
-    >(20, circuit);
+    >(21, circuit);
 }
 
 fn write_srs(k: u32) -> ParamsKZG<Bn256> {
@@ -435,7 +435,7 @@ fn write_srs(k: u32) -> ParamsKZG<Bn256> {
     params
         .write_custom(
             &mut std::fs::File::create(path).unwrap(),
-            halo2_pse::SerdeFormat::RawBytesUnchecked,
+            halo2::SerdeFormat::RawBytesUnchecked,
         )
         .unwrap();
     params
@@ -446,7 +446,7 @@ fn read_srs(k: u32) -> ParamsKZG<Bn256> {
     let file = std::fs::File::open(path.as_str());
     match file {
         Ok(mut file) => {
-            ParamsKZG::<Bn256>::read_custom(&mut file, halo2_pse::SerdeFormat::RawBytesUnchecked)
+            ParamsKZG::<Bn256>::read_custom(&mut file, halo2::SerdeFormat::RawBytesUnchecked)
                 .unwrap()
         }
         Err(_) => write_srs(k),

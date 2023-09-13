@@ -5,7 +5,7 @@ use circuitry::{
     witness::Witness,
 };
 use ff::PrimeField;
-use halo2_pse::circuit::Value;
+use halo2::circuit::Value;
 use num_bigint::BigUint;
 
 #[derive(Debug)]
