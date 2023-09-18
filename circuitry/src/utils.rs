@@ -1,6 +1,6 @@
 use ff::PrimeField;
 use num_bigint::BigUint;
-use num_traits::{Num, One, Zero};
+use num_traits::{One, Zero};
 use std::ops::Shl;
 
 pub fn modulus<F: PrimeField>() -> BigUint {

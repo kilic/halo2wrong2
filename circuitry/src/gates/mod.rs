@@ -8,9 +8,10 @@ use crate::LayoutCtx;
 
 // pub mod crt256;
 pub mod range;
+pub mod rom;
 pub mod select;
-pub mod var_vanilla;
 pub mod vanilla;
+pub mod var_vanilla;
 pub mod vertical;
 
 pub trait GateLayout<F: PrimeField + Ord, E> {

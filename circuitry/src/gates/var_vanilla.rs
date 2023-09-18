@@ -1,6 +1,5 @@
 use super::GateLayout;
 use crate::{
-    chip::second_degree,
     enforcement::{FirstDegreeComposition, SecondDegreeComposition, Selection},
     witness::{Composable, Scaled, SecondDegreeScaled, Term, Witness},
     LayoutCtx, RegionCtx,

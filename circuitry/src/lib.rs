@@ -1,11 +1,10 @@
 use ff::PrimeField;
+pub use halo2;
 use halo2::{
     circuit::{AssignedCell, Layouter, Region, Value},
-    plonk::{Advice, Any, Column, ConstraintSystem, Error, Fixed, Selector},
+    plonk::{Advice, Any, Column, Error, Fixed, Selector},
 };
-pub use halo2 as halo2;
 use std::{collections::BTreeMap, fmt::Debug};
-use witness::{Scaled, Witness};
 
 pub type AssignedValue<F> = AssignedCell<F, F>;
 pub type CellMap<F> = BTreeMap<u32, AssignedValue<F>>;

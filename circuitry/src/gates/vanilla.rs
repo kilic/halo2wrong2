@@ -405,22 +405,22 @@ impl<F: PrimeField> VanillaGate<F> {
         self.next(ctx)
     }
 
-    fn or(
-        &self,
-        ctx: &mut RegionCtx<'_, '_, F>,
-        w0: &Witness<F>,
-        w1: &Witness<F>,
-        result: &Witness<F>,
-    ) -> Result<(), Error> {
-        self.disable_next(ctx)?;
-        self.disable_constant(ctx)?;
-        self.enable_mul(ctx)?;
-        Self::assign(self, ctx, 0, &Scaled::sub(w0))?;
-        Self::assign(self, ctx, 1, &Scaled::sub(w1))?;
-        Self::assign(self, ctx, 2, &Scaled::add(result))?;
-        self.next(ctx)?;
-        Ok(())
-    }
+    // fn or(
+    //     &self,
+    //     ctx: &mut RegionCtx<'_, '_, F>,
+    //     w0: &Witness<F>,
+    //     w1: &Witness<F>,
+    //     result: &Witness<F>,
+    // ) -> Result<(), Error> {
+    //     self.disable_next(ctx)?;
+    //     self.disable_constant(ctx)?;
+    //     self.enable_mul(ctx)?;
+    //     Self::assign(self, ctx, 0, &Scaled::sub(w0))?;
+    //     Self::assign(self, ctx, 1, &Scaled::sub(w1))?;
+    //     Self::assign(self, ctx, 2, &Scaled::add(result))?;
+    //     self.next(ctx)?;
+    //     Ok(())
+    // }
 
     fn zero_sum(
         &self,

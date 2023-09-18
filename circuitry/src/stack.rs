@@ -9,19 +9,16 @@ use halo2::{
 use crate::{
     chip::{
         first_degree::FirstDegreeChip, second_degree::SecondDegreeChip, select::SelectChip, Chip,
-        Core,
+        Core, ROMChip,
     },
-    enforcement::{ConstantEquality, FirstDegreeComposition, SecondDegreeComposition, Selection},
-    gates::{
-        range::{range_sizes, RangeTableLayout},
-        GateLayout,
-    },
-    witness::{Composable, Scaled, Witness},
+    enforcement::{FirstDegreeComposition, MemoryOperation, SecondDegreeComposition, Selection},
+    gates::{range::RangeTableLayout, GateLayout},
+    witness::{Composable, Witness},
     LayoutCtx,
 };
 
 #[derive(Clone, Debug, Default)]
-pub struct Stack<F: PrimeField + Ord> {
+pub struct Stack<F: PrimeField + Ord, const MEM_W: usize> {
     // to give uniques id to witnesses
     pub(crate) number_of_witnesses: u32,
     // store registred constants
@@ -40,14 +37,18 @@ pub struct Stack<F: PrimeField + Ord> {
     pub(crate) first_degree_ternary_compositions: Vec<FirstDegreeComposition<F>>,
     // other first degree compositions
     pub(crate) first_degree_compositions: Vec<FirstDegreeComposition<F>>,
-    // composition enforcements to be layouted
+    // second degree enforcements to be layouted
     pub(crate) second_degree_compositions: Vec<SecondDegreeComposition<F>>,
-    // composition enforcements to be layouted
+    // selection enforcements to be layouted
     pub(crate) selections: Vec<Selection<F>>,
+    // ROM enforcements
+    pub(crate) rom: Vec<MemoryOperation<F, MEM_W>>,
+    // memory itself
+    pub(crate) memory: BTreeMap<F, BTreeMap<F, [F; MEM_W]>>,
 }
 
 // Essentias
-impl<F: PrimeField + Ord> Core<F> for Stack<F> {
+impl<F: PrimeField + Ord, const MEM_W: usize> Core<F> for Stack<F, MEM_W> {
     fn new_witness(&mut self, value: Value<F>) -> Witness<F> {
         self.number_of_witnesses += 1;
         Witness::new(self.number_of_witnesses, value)
@@ -107,7 +108,7 @@ impl<F: PrimeField + Ord> Core<F> for Stack<F> {
     }
 }
 
-impl<F: PrimeField + Ord> Stack<F> {
+impl<F: PrimeField + Ord, const MEM_W: usize> Stack<F, MEM_W> {
     pub fn layout_first_degree_compositions<
         L: Layouter<F>,
         Gate: GateLayout<F, Vec<FirstDegreeComposition<F>>>,
@@ -191,6 +192,17 @@ impl<F: PrimeField + Ord> Stack<F> {
         Ok(())
     }
 
+    pub fn layout_rom<L: Layouter<F>, Gate: GateLayout<F, Vec<MemoryOperation<F, MEM_W>>>>(
+        &mut self,
+        ly: &mut LayoutCtx<F, L>,
+        gate: &Gate,
+    ) -> Result<(), Error> {
+        println!("Layout ROM");
+        let e = std::mem::take(&mut self.rom);
+        gate.layout(ly, e)?;
+        Ok(())
+    }
+
     pub fn layout_range_tables<L: Layouter<F>, Gate: RangeTableLayout<F>>(
         &mut self,
         ly: &mut LayoutCtx<F, L>,
@@ -230,7 +242,9 @@ impl<F: PrimeField + Ord> Stack<F> {
     }
 }
 
-impl<F: PrimeField + Ord> Chip<FirstDegreeComposition<F>, F> for Stack<F> {
+impl<F: PrimeField + Ord, const MEM_W: usize> Chip<FirstDegreeComposition<F>, F>
+    for Stack<F, MEM_W>
+{
     fn new_op(&mut self, e: FirstDegreeComposition<F>) {
         if e.is_range_demoposition() {
             self.range_compositions.push(e)
@@ -244,20 +258,82 @@ impl<F: PrimeField + Ord> Chip<FirstDegreeComposition<F>, F> for Stack<F> {
     }
 }
 
-impl<F: PrimeField + Ord> Chip<SecondDegreeComposition<F>, F> for Stack<F> {
+impl<F: PrimeField + Ord, const MEM_W: usize> Chip<SecondDegreeComposition<F>, F>
+    for Stack<F, MEM_W>
+{
     fn new_op(&mut self, e: SecondDegreeComposition<F>) {
         self.second_degree_compositions.push(e);
     }
 }
 
-impl<F: PrimeField + Ord> Chip<Selection<F>, F> for Stack<F> {
+impl<F: PrimeField + Ord, const MEM_W: usize> Chip<Selection<F>, F> for Stack<F, MEM_W> {
     fn new_op(&mut self, e: Selection<F>) {
         self.selections.push(e);
     }
 }
 
-impl<F: PrimeField + Ord> SelectChip<F> for Stack<F> {}
+impl<F: PrimeField + Ord, const MEM_W: usize> SelectChip<F> for Stack<F, MEM_W> {}
 
-impl<F: PrimeField + Ord> crate::chip::first_degree::FirstDegreeChip<F> for Stack<F> {}
+impl<F: PrimeField + Ord, const MEM_W: usize> crate::chip::first_degree::FirstDegreeChip<F>
+    for Stack<F, MEM_W>
+{
+}
 
-impl<F: PrimeField + Ord> crate::chip::second_degree::SecondDegreeChip<F> for Stack<F> {}
+impl<F: PrimeField + Ord, const MEM_W: usize> crate::chip::second_degree::SecondDegreeChip<F>
+    for Stack<F, MEM_W>
+{
+}
+
+impl<F: PrimeField + Ord, const MEM_W: usize> Chip<MemoryOperation<F, MEM_W>, F>
+    for Stack<F, MEM_W>
+{
+    fn new_op(&mut self, e: MemoryOperation<F, MEM_W>) {
+        self.rom.push(e);
+    }
+}
+
+impl<F: PrimeField + Ord, const W: usize> ROMChip<F, W> for Stack<F, W> {
+    fn write(&mut self, tag: F, address: F, values: &[Witness<F>; W]) {
+        self.new_op(MemoryOperation::Write {
+            tag,
+            address,
+            values: values.clone(),
+        });
+
+        let values = values.iter().map(|value| value.value()).collect::<Vec<_>>();
+        let values: Value<Vec<F>> = Value::from_iter(values);
+        values.map(|values| {
+            let values = values.try_into().unwrap();
+            self.memory
+                .entry(tag)
+                .and_modify(|memory| {
+                    assert!(memory.insert(address, values).is_none());
+                })
+                .or_insert_with(|| BTreeMap::from([(address, values)]));
+        });
+    }
+
+    fn read(&mut self, tag: F, address_base: F, address_fraction: &Witness<F>) -> [Witness<F>; W] {
+        let values = address_fraction.value().map(|address_fraction| {
+            let address = address_fraction + address_base;
+            let memory = self.memory.get(&tag).unwrap();
+            let values = memory.get(&address).unwrap();
+            values.clone()
+        });
+        let values = values.transpose_array();
+        let values = values
+            .into_iter()
+            .map(|value| self.new_witness(value))
+            .collect::<Vec<_>>();
+        let values = values.try_into().unwrap();
+
+        self.new_op(MemoryOperation::Read {
+            tag,
+            address_base,
+            address_fraction: address_fraction.clone(),
+            values,
+        });
+
+        values
+    }
+}

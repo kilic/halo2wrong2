@@ -1,6 +1,6 @@
 use crate::{
     enforcement::SecondDegreeComposition,
-    witness::{Composable, SecondDegreeScaled, Term, Witness},
+    witness::{Composable, Term, Witness},
 };
 use ff::PrimeField;
 

@@ -1,5 +1,5 @@
 use crate::{
-    enforcement::{FirstDegreeComposition, SecondDegreeComposition},
+    enforcement::FirstDegreeComposition,
     utils::{decompose_into, decompose_into_dyn},
     witness::{Composable, Scaled, Witness},
 };
@@ -172,7 +172,7 @@ pub trait FirstDegreeChip<F: PrimeField + Ord>: Chip<FirstDegreeComposition<F>, 
         let result = Scaled::compose(&terms[..], constant_to_add);
         let result = self.new_witness(result).sub();
         terms.push(result);
-        let composition = FirstDegreeComposition::new(terms, constant_to_add);
+        let composition = FirstDegreeComposition::new_no_range(terms, constant_to_add);
         self.new_op(composition);
         result.witness
     }

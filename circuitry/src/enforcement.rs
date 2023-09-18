@@ -1,11 +1,27 @@
 use ff::PrimeField;
 
-use crate::witness::{Scaled, SecondDegreeScaled, Term, Witness};
+use crate::witness::{Scaled, Term, Witness};
+
+#[derive(Clone, Debug)]
+pub enum MemoryOperation<F: PrimeField, const W: usize> {
+    Write {
+        tag: F,
+        address: F,
+        values: [Witness<F>; W],
+    },
+    Read {
+        tag: F,
+        address_base: F,
+        address_fraction: Witness<F>,
+        values: [Witness<F>; W],
+    },
+}
 
 #[derive(Debug, Clone)]
 pub struct FirstDegreeComposition<F: PrimeField> {
     pub(crate) terms: Vec<Scaled<F>>,
     pub(crate) constant: F,
+    pub(crate) is_range_decomposition: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -14,26 +30,42 @@ pub struct SecondDegreeComposition<F: PrimeField> {
     pub(crate) constant: F,
 }
 
-impl<F: PrimeField> SecondDegreeComposition<F> {
-    pub fn new(terms: Vec<Term<F>>, constant: F) -> Self {
-        SecondDegreeComposition { terms, constant }
-    }
-}
-
 impl<F: PrimeField> FirstDegreeComposition<F> {
+    pub fn new(terms: Vec<Scaled<F>>, constant: F) -> Self {
+        let is_range_decomposition = Self::_is_range_demoposition(&terms);
+        FirstDegreeComposition {
+            terms,
+            constant,
+            is_range_decomposition,
+        }
+    }
+
+    pub fn new_no_range(terms: Vec<Scaled<F>>, constant: F) -> Self {
+        FirstDegreeComposition {
+            terms,
+            constant,
+            is_range_decomposition: false,
+        }
+    }
+
     pub fn is_simple(&self) -> bool {
         self.terms.len() <= 3
     }
 
-    pub fn is_range_demoposition(&self) -> bool {
-        if self.terms.len() == 1 {
-            return self.terms[0].witness.range.is_some();
+    fn _is_range_demoposition(terms: &[Scaled<F>]) -> bool {
+        if terms.len() == 1 {
+            return terms[0].witness.range.is_some();
         }
         let mut decision = true;
-        for term in self.terms.iter().rev().skip(1) {
+        for term in terms.iter().rev().skip(1) {
             decision = decision & term.witness.range.is_some()
         }
         decision
+    }
+
+    pub fn is_range_demoposition(&self) -> bool {
+        // Self::_is_range_demoposition(&self.terms)
+        self.is_range_decomposition
     }
 
     pub fn len(&self) -> usize {
@@ -45,21 +77,9 @@ impl<F: PrimeField> FirstDegreeComposition<F> {
     }
 }
 
-impl<F: PrimeField> FirstDegreeComposition<F> {
-    pub fn new(terms: Vec<Scaled<F>>, constant: F) -> Self {
-        FirstDegreeComposition { terms, constant }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct ConstantEquality<F: PrimeField> {
-    pub(crate) witness: Witness<F>,
-    pub(crate) constant: F,
-}
-
-impl<F: PrimeField> ConstantEquality<F> {
-    pub fn new(witness: Witness<F>, constant: F) -> Self {
-        ConstantEquality { witness, constant }
+impl<F: PrimeField> SecondDegreeComposition<F> {
+    pub fn new(terms: Vec<Term<F>>, constant: F) -> Self {
+        SecondDegreeComposition { terms, constant }
     }
 }
 

@@ -52,7 +52,7 @@ pub fn rand_value_in_range<F: PrimeField>(bit_size: usize) -> Value<F> {
     v!(big_to_fe(u))
 }
 
-impl<F: PrimeField + Ord> Stack<F> {
+impl<F: PrimeField + Ord, const MEM_W: usize> Stack<F, MEM_W> {
     pub(crate) fn _assign_witness(&mut self, w: &Witness<F>) {
         let e = FirstDegreeComposition::new(vec![w.add(), w.sub()], F::ZERO);
         self.first_degree_ternary_compositions.push(e);
@@ -106,14 +106,13 @@ mod test_composition {
             range::in_place_sparse::RangeInPlaceSpaseGate, vanilla::VanillaGate,
             var_vanilla::VarVanillaGate,
         },
-        utils::modulus,
         witness::Term,
     };
 
     use super::*;
 
     fn make_stack_first_degree<'a, F: PrimeField + Ord, const LIMB_SIZE: usize>(
-        stack: &mut Stack<F>,
+        stack: &mut Stack<F, 0>,
         use_constants: bool,
     ) {
         let rand = || F::random(OsRng);
@@ -151,7 +150,7 @@ mod test_composition {
         }
     }
 
-    fn make_stack_second_degree<'a, F: PrimeField + Ord>(stack: &mut Stack<F>) {
+    fn make_stack_second_degree<'a, F: PrimeField + Ord>(stack: &mut Stack<F, 0>) {
         let rand = || F::random(OsRng);
 
         // combination second degree
@@ -239,7 +238,7 @@ mod test_composition {
         }
 
         fn synthesize(&self, cfg: Self::Config, ly: impl Layouter<F>) -> Result<(), Error> {
-            let mut stack: Stack<F> = Stack::default();
+            let mut stack: Stack<F, 0> = Stack::default();
             make_stack_first_degree::<_, 8>(&mut stack, false);
             let ly = &mut LayoutCtx::new(ly);
 
@@ -298,7 +297,7 @@ mod test_composition {
         }
 
         fn synthesize(&self, cfg: Self::Config, ly: impl Layouter<F>) -> Result<(), Error> {
-            let mut stack: Stack<F> = Stack::default();
+            let mut stack: Stack<F, 0> = Stack::default();
             make_stack_first_degree::<_, 8>(&mut stack, true);
             make_stack_second_degree::<_>(&mut stack);
             let ly = &mut LayoutCtx::new(ly);
@@ -356,7 +355,7 @@ mod test_composition {
         }
 
         fn synthesize(&self, cfg: Self::Config, ly: impl Layouter<F>) -> Result<(), Error> {
-            let mut stack: Stack<F> = Stack::default();
+            let mut stack: Stack<F, 0> = Stack::default();
             make_stack_first_degree::<_, 8>(&mut stack, true);
             make_stack_second_degree::<_>(&mut stack);
             let ly = &mut LayoutCtx::new(ly);
@@ -402,7 +401,7 @@ mod test_arithmetic {
 
     use super::*;
 
-    fn make_stack<F: PrimeField + Ord>() -> Stack<F> {
+    fn make_stack<F: PrimeField + Ord>() -> Stack<F, 0> {
         let mut stack = Stack::default();
 
         let rand = || F::random(OsRng);
@@ -670,7 +669,7 @@ mod test_arithmetic {
         run_test_var_vanilla::<Fp, 7>();
     }
 
-    fn make_stack_simpler<F: PrimeField + Ord>() -> Stack<F> {
+    fn make_stack_simpler<F: PrimeField + Ord>() -> Stack<F, 0> {
         let mut stack = Stack::default();
 
         let rand = || F::random(OsRng);
@@ -757,7 +756,154 @@ mod test_arithmetic {
     }
 
     #[test]
-    fn test_arithmetic_vertical() {
+    fn test_vertical() {
         run_test_vertical::<Fp>();
+    }
+}
+
+mod test_rom {
+
+    use crate::{
+        chip::ROMChip,
+        gates::{rom::ROMGate, vanilla::VanillaGate},
+    };
+
+    use super::*;
+
+    fn make_stack<F: PrimeField + Ord, const MEM_W: usize>() -> Stack<F, MEM_W> {
+        let mut stack: Stack<F, MEM_W> = Stack::default();
+
+        let tag = F::random(OsRng);
+
+        let w0 = (0..MEM_W)
+            .map(|_| stack.assign_rand_witness())
+            .collect::<Vec<_>>();
+        let w0: &[Witness<F>; MEM_W] = &w0.try_into().unwrap();
+
+        let w1 = (0..MEM_W)
+            .map(|_| stack.assign_rand_witness())
+            .collect::<Vec<_>>();
+        let w1 = &w1.try_into().unwrap();
+
+        let w2 = (0..MEM_W)
+            .map(|_| stack.assign_rand_witness())
+            .collect::<Vec<_>>();
+        let w2 = &w2.try_into().unwrap();
+
+        let w3 = (0..MEM_W)
+            .map(|_| stack.assign_rand_witness())
+            .collect::<Vec<_>>();
+        let w3 = &w3.try_into().unwrap();
+
+        let a0 = F::from(0);
+        let a1 = F::from(1);
+        let a2 = F::from(2);
+        let a3 = F::from(3);
+
+        stack.write(tag, a0, w0);
+        stack.write(tag, a1, w1);
+        stack.write(tag, a2, w2);
+        stack.write(tag, a3, w3);
+
+        let f0 = &stack.assign(v!(F::from(0)));
+        let f1 = &stack.assign(v!(F::from(1)));
+        let f2 = &stack.assign(v!(F::from(2)));
+        let f3 = &stack.assign(v!(F::from(3)));
+
+        let _w1 = stack.read(tag, F::ZERO, f1);
+        w1.iter().zip(_w1.iter()).for_each(|(w, a)| {
+            stack.equal(w, a);
+        });
+        let _w0 = stack.read(tag, F::ZERO, f0);
+        w0.iter().zip(_w0.iter()).for_each(|(w, a)| {
+            stack.equal(w, a);
+        });
+        let _w3 = stack.read(tag, F::ZERO, f3);
+        w3.iter().zip(_w3.iter()).for_each(|(w, a)| {
+            stack.equal(w, a);
+        });
+        let _w3 = stack.read(tag, F::ZERO, f3);
+        w3.iter().zip(_w3.iter()).for_each(|(w, a)| {
+            stack.equal(w, a);
+        });
+        let _w0 = stack.read(tag, F::ZERO, f0);
+        w0.iter().zip(_w0.iter()).for_each(|(w, a)| {
+            stack.equal(w, a);
+        });
+        let _w2 = stack.read(tag, F::ZERO, f2);
+        w2.iter().zip(_w2.iter()).for_each(|(w, a)| {
+            stack.equal(w, a);
+        });
+        let _w2 = stack.read(tag, F::ZERO, f2);
+        w2.iter().zip(_w2.iter()).for_each(|(w, a)| {
+            stack.equal(w, a);
+        });
+
+        stack
+    }
+
+    #[derive(Clone)]
+    struct TestConfigVertical<F: PrimeField + Ord> {
+        vanilla_gate: VanillaGate<F>,
+        rom_gate: ROMGate<F, 3>,
+    }
+
+    struct TestCircuitVertical<F: PrimeField + Ord> {
+        _marker: PhantomData<F>,
+    }
+
+    impl<F: PrimeField + Ord> Circuit<F> for TestCircuitVertical<F> {
+        type Config = TestConfigVertical<F>;
+        type FloorPlanner = SimpleFloorPlanner;
+
+        fn configure(meta: &mut ConstraintSystem<F>) -> Self::Config {
+            let vanilla_gate = VanillaGate::new(meta);
+            vanilla_gate.configure(meta);
+            let query_values = vanilla_gate.advice_colums();
+            let table_values = query_values.clone();
+            let query_fraction = meta.advice_column();
+
+            let rom_gate = ROMGate::configure(meta, query_fraction, query_values, table_values);
+
+            Self::Config {
+                vanilla_gate,
+                rom_gate,
+            }
+        }
+
+        fn without_witnesses(&self) -> Self {
+            Self {
+                _marker: PhantomData,
+            }
+        }
+
+        fn synthesize(&self, cfg: Self::Config, ly: impl Layouter<F>) -> Result<(), Error> {
+            let mut stack = make_stack::<_, 3>();
+            let ly = &mut LayoutCtx::new(ly);
+            stack.layout_first_degree_compositions(ly, &cfg.vanilla_gate)?;
+            stack.layout_first_degree_ternary_compositions(ly, &cfg.vanilla_gate)?;
+            stack.layout_second_degree_compositions(ly, &cfg.vanilla_gate)?;
+            stack.layout_rom(ly, &cfg.rom_gate)?;
+            stack.apply_indirect_copies(ly)?;
+            Ok(())
+        }
+    }
+
+    fn run_test_rom<F: Ord + FromUniformBytes<64>>() {
+        const K: u32 = 17;
+        let circuit = TestCircuitVertical::<F> {
+            _marker: PhantomData::<F>,
+        };
+        let public_inputs: Vec<Vec<F>> = vec![];
+        let prover = match MockProver::run(K, &circuit, public_inputs) {
+            Ok(prover) => prover,
+            Err(e) => panic!("{e:#?}"),
+        };
+        prover.assert_satisfied();
+    }
+
+    #[test]
+    fn test_rom() {
+        run_test_rom::<Fp>();
     }
 }
