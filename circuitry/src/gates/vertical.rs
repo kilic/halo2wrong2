@@ -52,6 +52,14 @@ impl<F: PrimeField, R: RangeInPlace<F, 1>> VerticalGate<F, R> {
         }
     }
 
+    pub fn advice_column(&self) -> Column<Advice> {
+        self.advice
+    }
+
+    pub fn acc_column(&self) -> Column<Advice> {
+        self.acc
+    }
+
     pub fn configure_composition_gate(&mut self, meta: &mut ConstraintSystem<F>) {
         meta.enable_equality(self.advice);
         let acc_selector = meta.selector();

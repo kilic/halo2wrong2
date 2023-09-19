@@ -5,7 +5,7 @@ use ark_std::{end_timer, start_timer};
 use circuitry::gates::range::in_place::RangeInPlaceGate;
 use circuitry::gates::range::RangeInPlace;
 use circuitry::gates::rom::ROMGate;
-use circuitry::gates::var_vanilla::VarVanillaGate;
+use circuitry::gates::vanilla::VanillaGate;
 use circuitry::gates::vertical::VerticalGate;
 use circuitry::stack::Stack;
 use ff::Field;
@@ -175,7 +175,7 @@ struct TestConfig<
     const SUBLIMB_SIZE: usize,
 > {
     vertical_gate: VerticalGate<C::Scalar, R>,
-    vanilla_gate: VarVanillaGate<C::Scalar, 4>,
+    vanilla_gate: VanillaGate<C::Scalar>,
     // select_gate: SelectGate<C::Scalar>,
     rom_gate: ROMGate<C::Scalar, NUMBER_OF_LIMBS>,
     rns: Rns<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>,
@@ -221,15 +221,16 @@ impl<
         let mut vertical_gate = VerticalGate::new(meta, range_gate, scale, advice, acc);
         vertical_gate.configure_composition_gate(meta);
 
-        let vanilla_gate = VarVanillaGate::new(meta);
+        let vanilla_gate = VanillaGate::new(meta);
         vanilla_gate.configure(meta);
+
         let shared_columns = vanilla_gate.advice_colums();
         let rom_value_columns: [Column<Advice>; NUMBER_OF_LIMBS] =
             shared_columns[0..NUMBER_OF_LIMBS].try_into().unwrap();
-        let query_fraction = shared_columns.last().unwrap();
+        let query_fraction = vertical_gate.advice_column();
 
         let rom_gate =
-            ROMGate::configure(meta, *query_fraction, rom_value_columns, rom_value_columns);
+            ROMGate::configure(meta, query_fraction, rom_value_columns, rom_value_columns);
 
         // let select_gate = SelectGate::new(
         //     meta,
@@ -390,7 +391,7 @@ fn run_test_prover<
     proof.expect("proof generation should not fail");
 }
 
-// #[test]
+#[test]
 fn test_prover() {
     let aux_generator = Value::known(G1::random(OsRng).into());
 
