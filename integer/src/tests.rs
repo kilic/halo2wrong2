@@ -51,7 +51,7 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const LIMB_SIZE
     }
 
     pub fn rand_in_remainder_range(&self) -> UnassignedInteger<W, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
-        UnassignedInteger::from(Value::known(OsRng.gen_biguint(self._max_remainder.bits())))
+        UnassignedInteger::from(Value::known(OsRng.gen_biguint(self.max_remainder.bits())))
     }
 
     pub fn rand_in_operand_range(&self) -> UnassignedInteger<W, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
@@ -97,8 +97,8 @@ fn make_stack<
     const SUBLIMB_SIZE: usize,
 >(
     rns: &Rns<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-) -> Stack<N> {
-    let stack = &mut Stack::<N>::default();
+) -> Stack<N, 0> {
+    let stack = &mut Stack::<N, 0>::default();
 
     let ch: IntegerChip<W, N, NUMBER_OF_LIMBS, LIMB_SIZE, NUMBER_OF_SUBLIMBS, SUBLIMB_SIZE> =
         IntegerChip::new(rns);
@@ -426,6 +426,7 @@ impl<
 
         stack.layout_second_degree_compositions(ly_ctx, &cfg.vanilla_gate)?;
         stack.layout_first_degree_ternary_compositions(ly_ctx, &cfg.vanilla_gate)?;
+        stack.layout_range_compositions(ly_ctx, &cfg.vanilla_gate)?;
         stack.layout_selections(ly_ctx, &cfg.vanilla_gate)?;
 
         stack.layout_range_tables(ly_ctx, &cfg.vertical_gate)?;
@@ -461,7 +462,7 @@ fn run_test<
 }
 
 #[test]
-fn test_integer_y() {
+fn test_integer() {
     use halo2::halo2curves::pasta::{Fp as PastaFp, Fq as PastaFq};
 
     run_test::<
@@ -474,69 +475,3 @@ fn test_integer_y() {
         18, // sublimb size
     >(19);
 }
-
-// terms [
-//     Second(
-//         SecondDegreeScaled {
-//             w0: Witness {
-//                 id: Some(
-//                     114,
-//                 ),
-//                 range: None,
-//                 bit_size: 90,
-//                 value: 0x000000000000000000000000000000000000000003d8f1bedd5c864cb300869d,
-//             },
-//             w1: Witness {
-//                 id: Some(
-//                     133,
-//                 ),
-//                 range: None,
-//                 bit_size: 90,
-//                 value: 0x0000000000000000000000000000000000000000035f1a606e1fef7e64047b95,
-//             },
-//             factor: 0x3930e9c8c46eb20ffffffff0000000001ea11267c056b99ad8199bea4df15ba0,
-//         },
-//     ),
-//     First(
-//         Scaled {
-//             witness: Witness {
-//                 id: Some(
-//                     228,
-//                 ),
-//                 range: None,
-//                 bit_size: 89,
-//                 value: 0x000000000000000000000000000000000000000001d7f4d0c8f80f1b8d4e6f2c,
-//             },
-//             factor: 0x22f0cf20ce645cc0000000100000000012b678f17edf9097262f7112bfc31170,
-//         },
-//     ),
-//     First(
-//         Scaled {
-//             witness: Witness {
-//                 id: Some(
-//                     209,
-//                 ),
-//                 range: None,
-//                 bit_size: 86,
-//                 value: 0x000000000000000000000000000000000000000000285ab8871d20477ce29d3c,
-//             },
-//             factor: 0x06cf16373b914df0000000100000000003a58694493def42b42d4f36b20ea461,
-//         },
-//     ),
-//     First(
-//         Scaled {
-//             witness: Witness {
-//                 id: Some(
-//                     171,
-//                 ),
-//                 range: None,
-//                 bit_size: 90,
-//                 value: 0x0000000000000000000000000000000000000000031ea868f7d4819c2bc14407,
-//             },
-//             factor: 0x3930e9c8c46eb20ffffffff0000000001ea11267c056b99ad8199bea4df15ba0,
-//         },
-//     ),
-//     Zero,
-// ]
-
-fn mul_div_sim() {}

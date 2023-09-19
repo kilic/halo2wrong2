@@ -4,7 +4,7 @@ use circuitry::chip::first_degree::FirstDegreeChip;
 use circuitry::chip::second_degree::SecondDegreeChip;
 use circuitry::witness::Scaled;
 use ff::PrimeField;
-use num_bigint::BigUint as Big;
+use num_bigint::BigUint;
 
 impl<
         W: PrimeField,
@@ -28,7 +28,7 @@ impl<
         #[cfg(feature = "synth-sanity")]
         {
             let two_pow_limb_bits_minus_1 =
-                Big::from(2u64).pow((LIMB_SIZE - 1).try_into().unwrap());
+                BigUint::from(2u64).pow((LIMB_SIZE - 1).try_into().unwrap());
             assert!(
                 self.rns.wrong_modulus.clone()
                     <= self.rns.native_modulus.clone() * two_pow_limb_bits_minus_1

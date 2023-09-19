@@ -1,5 +1,6 @@
 use crate::integer::Integer;
 use ff::PrimeField;
+use halo2::circuit::Value;
 use num_bigint::BigUint;
 
 use crate::{
@@ -26,12 +27,20 @@ impl<
         a.max() > self.rns.max_operand
     }
 
+    pub(crate) fn is_gt_max_remainder(
+        &self,
+        a: &Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
+    ) -> bool {
+        a.max() > self.rns.max_remainder
+    }
+
     pub(crate) fn reduce_if_gt_max_operand<Stack: SecondDegreeChip<N> + FirstDegreeChip<N>>(
         &self,
         stack: &mut Stack,
 
         a: &Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
     ) -> Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
+        // TODO: consider disallowing under the hood redcution
         if self.is_gt_max_operand(a) {
             // here to signal mostly unexpected behavior
             println!("GT MAX OPERAND!");
@@ -46,10 +55,10 @@ use std::collections::BTreeMap;
 
 use circuitry::{
     chip::{
-        first_degree::FirstDegreeChip, second_degree::SecondDegreeChip, select::SelectChip, Chip,
-        Core,
+        first_degree::FirstDegreeChip, second_degree::SecondDegreeChip, select::SelectChip, Core,
+        ROMChip,
     },
-    utils::{big_to_fe_unsafe, compose_into},
+    utils::{big_to_fe_unsafe, compose, compose_into, fe_to_big},
     witness::{Composable, Scaled, Witness},
 };
 
@@ -302,6 +311,48 @@ impl<
             });
 
         Integer::new(&limbs, &max_vals, big, native)
+    }
+
+    pub fn write<Stack: FirstDegreeChip<N> + ROMChip<N, NUMBER_OF_LIMBS>>(
+        &self,
+        stack: &mut Stack,
+        tag: N,
+        address: N,
+        integer: &Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
+    ) {
+        assert!(!self.is_gt_max_remainder(integer));
+        stack.write(tag, address, &integer.limbs);
+    }
+
+    pub fn read_recover<Stack: FirstDegreeChip<N> + ROMChip<N, NUMBER_OF_LIMBS>>(
+        &self,
+        stack: &mut Stack,
+        tag: N,
+        address_base: N,
+        address_fraction: &Witness<N>,
+    ) -> Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
+        let limbs = stack.read(tag, address_base, address_fraction);
+
+        // recover native value
+        let terms: Vec<Scaled<N>> = limbs
+            .iter()
+            .zip(self.rns.left_shifters.iter())
+            .map(|(limb, base)| Scaled::new(limb, *base))
+            .collect();
+        let native = stack.compose(&terms[..], N::ZERO);
+
+        // find the big
+        let values = limbs.iter().map(|limb| limb.value()).collect::<Vec<_>>();
+        let values: Value<Vec<N>> = Value::from_iter(values);
+        let big = values.map(|values| {
+            let limbs = values.iter().map(fe_to_big).collect::<Vec<_>>();
+            compose::<NUMBER_OF_LIMBS, LIMB_SIZE>(&limbs.try_into().unwrap())
+        });
+
+        // written value is asumed to be in remeinder range
+        let max_values = self.rns.max_values(Range::Remainder);
+
+        Integer::new(&limbs.try_into().unwrap(), &max_values, big, native)
     }
 
     // pub fn assert_bit(

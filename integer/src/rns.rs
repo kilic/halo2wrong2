@@ -28,7 +28,7 @@ pub struct Rns<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const
     pub(super) max_reduction_quotient_value: BigUint,
     pub(super) max_unreduced_value: BigUint,
 
-    pub(super) _max_remainder: BigUint,
+    pub(super) max_remainder: BigUint,
     pub(super) max_operand: BigUint,
     pub(super) max_quotient: BigUint,
     pub(super) max_most_significant_reduced_limb: BigUint,
@@ -242,7 +242,7 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const LIMB_SIZE
             max_reduction_quotient_value,
             max_unreduced_value,
 
-            _max_remainder: max_remainder.clone(),
+            max_remainder: max_remainder.clone(),
             max_operand: max_operand.clone(),
             max_quotient: max_quotient.clone(),
             max_most_significant_reduced_limb: max_most_significant_reduced_limb.clone(),
@@ -413,7 +413,7 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const LIMB_SIZE
 
         #[cfg(feature = "synth-sanity")]
         {
-            let result_max = &self._max_remainder;
+            let result_max = &self.max_remainder;
             let max_lhs = result_max * denom.max() + &shifter;
             let max_rhs = &self.max_quotient * &self.wrong_modulus;
             assert!(max_rhs > max_lhs);

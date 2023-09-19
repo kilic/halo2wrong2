@@ -71,33 +71,6 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const LIMB_SIZE
                 })
         };
 
-        let two = N::ONE + N::ONE;
-        let base = two.pow([(LIMB_SIZE) as u64]);
-
-        let binary_modulus = &(BigUint::one() << (LIMB_SIZE * NUMBER_OF_LIMBS));
-        let wrong_modulus = &modulus::<W>();
-        let negative_wrong_modulus_decomposed =
-            decompose::<NUMBER_OF_LIMBS, LIMB_SIZE>(&(binary_modulus - wrong_modulus));
-        let negative_wrong_modulus_decomposed: [N; NUMBER_OF_LIMBS] =
-            negative_wrong_modulus_decomposed
-                .iter()
-                .map(big_to_fe_unsafe)
-                .collect::<Vec<_>>()
-                .try_into()
-                .unwrap();
-
-        let native_modulus = &modulus::<N>();
-        let wrong_modulus_in_native_modulus: N = big_to_fe(&(wrong_modulus % native_modulus));
-
-        let nat = |limbs: Vec<Expression<N>>| -> Expression<N> {
-            limbs
-                .into_iter()
-                .enumerate()
-                .fold(Expression::Constant(N::ZERO), |acc, (i, limb)| {
-                    acc + limb * base.pow(&[i as u64])
-                })
-        };
-
         meta.create_gate("mul", |meta| {
             // should work with division and squaring
 
