@@ -1,13 +1,12 @@
 use circuitry::{
-    chip::{first_degree::FirstDegreeChip, second_degree::SecondDegreeChip, select::SelectChip},
-    utils::{compose, fe_to_big},
-    witness::{Composable, Scaled, Witness},
+    chip::{
+        first_degree::FirstDegreeChip, second_degree::SecondDegreeChip, select::SelectChip, ROMChip,
+    },
+    witness::{Composable, Witness},
 };
 use ff::{Field, PrimeField};
-use group::{Curve, Group};
-use halo2::{circuit::Value, halo2curves::CurveAffine};
-use integer::integer::{Integer, UnassignedInteger};
-use num_bigint::BigUint;
+use halo2::halo2curves::CurveAffine;
+use std::{ops::Deref, vec};
 
 macro_rules! div_ceil {
     ($a:expr, $b:expr) => {
@@ -15,10 +14,7 @@ macro_rules! div_ceil {
     };
 }
 
-use crate::{
-    utils::{binary_table, mul_fix},
-    Point,
-};
+use crate::Point;
 
 use super::BaseFieldEccChip;
 
@@ -44,67 +40,60 @@ impl<
         assert!(number_of_points > 0);
         assert_eq!(number_of_points, scalars.len());
 
-        let mut acc = self.assign_point(stack, self.aux_generator);
-        let mut acc_aux = None;
+        let mut round_aux = self.assign_point(stack, self.aux_generator);
+        let mut round_aux_acc = None;
 
         let tables = points
             .chunks(window_size)
             .enumerate()
             .map(|(_, chunk)| {
-                let mut table = vec![acc.clone()];
-
+                let mut table = vec![round_aux.clone()];
                 for (i, point) in chunk.iter().enumerate() {
                     for j in 0..(1 << i) {
                         table.push(self.add_incomplete(stack, &table[j], point));
                     }
                 }
 
-                acc_aux = if let Some(acc_aux) = &acc_aux {
-                    Some(self.add_incomplete(stack, &acc, &acc_aux))
+                // update round aux
+                round_aux_acc = if let Some(round_aux_acc) = &round_aux_acc {
+                    Some(self.add_incomplete(stack, &round_aux, &round_aux_acc))
                 } else {
-                    Some(acc.clone())
+                    Some(round_aux.clone())
                 };
+                round_aux = self.double_incomplete(stack, &round_aux);
 
-                acc = self.double_incomplete(stack, &acc);
                 table
             })
             .collect::<Vec<_>>();
+
+        let round_aux_acc = round_aux_acc.unwrap();
+        let mut correction = round_aux_acc.clone();
+        for _ in 1..(C::Scalar::NUM_BITS as usize) {
+            // TODO: use ladder
+            correction = self.double_incomplete(stack, &correction);
+            correction = self.add_incomplete(stack, &correction, &round_aux_acc);
+        }
 
         let scalars = scalars
             .iter()
             .map(|scalar| {
                 let (_scalar, mut bits) =
                     stack.decompose_generic(scalar.value(), C::Scalar::NUM_BITS as usize, 1);
-
                 stack.equal(&_scalar, scalar);
-
                 bits.reverse();
                 bits
             })
             .collect::<Vec<_>>();
 
-        let acc_aux = acc_aux.unwrap();
         let mut acc = None;
-        let mut correction = None;
+
         for round in 0..(C::Scalar::NUM_BITS as usize) {
-            if let Some(_acc) = acc {
-                acc = Some(self.double_incomplete(stack, &_acc));
-            }
-
-            // TODO: use ladder
-            if let Some(_correction) = correction {
-                correction = Some(self.double_incomplete(stack, &_correction));
-            }
-            correction = if let Some(correction) = &correction {
-                Some(self.add_incomplete(stack, &correction, &acc_aux))
-            } else {
-                Some(acc_aux.clone())
-            };
-
             let mut chain = Vec::with_capacity(tables.len() + 1);
-            if let Some(acc) = acc {
-                chain.push(acc)
-            }
+
+            acc.as_mut().map(|acc| {
+                *acc = self.double_incomplete(stack, &acc);
+                chain.push(acc.deref().clone());
+            });
 
             for (_, (table, scalars)) in tables.iter().zip(scalars.chunks(window_size)).enumerate()
             {
@@ -115,146 +104,305 @@ impl<
                     .map(|scalar| scalar[round])
                     .collect::<Vec<_>>();
 
-                let to_add = self.select_multi(stack, &selector, table);
+                chain.push(self.select_multi(stack, &selector, table));
+            }
+            acc = Some(self.add_multi(stack, &chain[..]));
+        }
 
+        self.sub_incomplete(stack, &acc.unwrap(), &correction)
+    }
+
+    pub fn msm_sliding_vertical_rom<
+        Stack: SecondDegreeChip<C::Scalar>
+            + FirstDegreeChip<C::Scalar>
+            + ROMChip<C::Scalar, NUMBER_OF_LIMBS>,
+    >(
+        &self,
+        stack: &mut Stack,
+        tag: C::Scalar,
+        points: &[Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>],
+        scalars: &[Witness<C::Scalar>],
+        window_size: usize,
+    ) -> Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE> {
+        let number_of_points = points.len();
+        assert!(number_of_points > 0);
+        assert_eq!(number_of_points, scalars.len());
+        let table_size = (1 << window_size) as usize;
+
+        let mut round_aux = self.assign_point(stack, self.aux_generator);
+        let mut round_aux_acc = None;
+
+        points
+            .chunks(window_size)
+            .enumerate()
+            .for_each(|(chunk_idx, chunk)| {
+                let address_base_chunk = C::Scalar::from((2 * chunk_idx * table_size) as u64);
+
+                let mut table = vec![round_aux.clone()];
+                self.write_rom(
+                    stack,
+                    tag,
+                    address_base_chunk,
+                    table_size,
+                    &table.last().unwrap(),
+                );
+
+                for (i, point) in chunk.iter().enumerate() {
+                    for j in 0..(1 << i) {
+                        let address_base =
+                            C::Scalar::from(((1 << i) + j) as u64) + address_base_chunk;
+                        table.push(self.add_incomplete(stack, &table[j], point));
+                        self.write_rom(
+                            stack,
+                            tag,
+                            address_base,
+                            table_size,
+                            &table.last().unwrap(),
+                        );
+                    }
+                }
+
+                // update round aux
+                round_aux_acc = if let Some(acc_round_aux) = &round_aux_acc {
+                    Some(self.add_incomplete(stack, &round_aux, &acc_round_aux))
+                } else {
+                    Some(round_aux.clone())
+                };
+                round_aux = self.double_incomplete(stack, &round_aux);
+            });
+
+        let round_aux_acc = round_aux_acc.unwrap();
+        let mut correction = round_aux_acc.clone();
+        for _ in 1..(C::Scalar::NUM_BITS as usize) {
+            // TODO: use ladder
+            correction = self.double_incomplete(stack, &correction);
+            correction = self.add_incomplete(stack, &correction, &round_aux_acc);
+        }
+
+        let scalars = scalars
+            .iter()
+            .map(|scalar| {
+                let (_scalar, mut bits) =
+                    stack.decompose_generic(scalar.value(), C::Scalar::NUM_BITS as usize, 1);
+                stack.equal(&_scalar, scalar);
+                bits.reverse();
+                bits
+            })
+            .collect::<Vec<_>>();
+
+        let mut acc = None;
+
+        for round in 0..(C::Scalar::NUM_BITS as usize) {
+            let mut chain = Vec::with_capacity(table_size + 1);
+
+            acc.as_mut().map(|acc| {
+                *acc = self.double_incomplete(stack, &acc);
+                chain.push(acc.deref().clone());
+            });
+
+            for (chunk_idx, scalars) in scalars.chunks(window_size).enumerate() {
+                let selector = scalars
+                    .iter()
+                    .map(|scalar| scalar[round])
+                    .collect::<Vec<_>>();
+                let mut base = C::Scalar::ONE;
+                let selector = selector
+                    .iter()
+                    .map(|bit| {
+                        let scaled = bit.scale(base);
+                        base = base + base;
+                        scaled
+                    })
+                    .collect::<Vec<_>>();
+
+                let address_base = C::Scalar::from((2 * chunk_idx * table_size) as u64);
+                let address_fraction = &stack.compose(&selector[..], C::Scalar::ZERO);
+
+                chain.push(self.read_rom(stack, tag, address_base, address_fraction, table_size));
+            }
+            acc = Some(self.add_multi(stack, &chain[..]));
+        }
+
+        self.sub_incomplete(stack, &acc.unwrap(), &correction)
+    }
+
+    pub fn msm_sliding_horizontal<
+        Stack: SecondDegreeChip<C::Scalar> + FirstDegreeChip<C::Scalar> + SelectChip<C::Scalar>,
+    >(
+        &self,
+        stack: &mut Stack,
+
+        points: &[Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>],
+        scalars: &[Witness<C::Scalar>],
+        window_size: usize,
+    ) -> Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE> {
+        let number_of_points = points.len();
+        assert!(number_of_points > 0);
+        assert_eq!(number_of_points, scalars.len());
+
+        let number_of_rounds = div_ceil!(C::Scalar::NUM_BITS as usize, window_size);
+        let table_size = 1 << window_size;
+
+        let mut aux_pow2 = self.assign_point(stack, self.aux_generator);
+        let mut aux_round_acc = aux_pow2.clone();
+        let tables: Vec<Vec<Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>>> = points
+            .iter()
+            .enumerate()
+            .map(|(i, point)| {
+                let mut table = vec![aux_pow2.clone()];
+                for i in 0..(table_size - 1) {
+                    table.push(self.add_incomplete(stack, &table[i], point));
+                }
+
+                if i != number_of_points - 1 {
+                    aux_pow2 = self.double_incomplete(stack, &aux_pow2);
+                    aux_round_acc = self.add_incomplete(stack, &aux_round_acc, &aux_pow2);
+                }
+                table
+            })
+            .collect();
+
+        let mut correction = aux_round_acc.clone();
+        for _ in 1..number_of_rounds {
+            for _ in 0..window_size {
+                correction = self.double_incomplete(stack, &correction);
+            }
+            correction = self.add_incomplete(stack, &correction, &aux_round_acc);
+        }
+
+        let scalars = scalars
+            .iter()
+            .map(|scalar| {
+                let (_scalar, bits) =
+                    stack.decompose_generic(scalar.value(), C::Scalar::NUM_BITS as usize, 1);
+
+                stack.equal(&_scalar, scalar);
+
+                bits.chunks(window_size)
+                    .rev()
+                    .map(|chunk| chunk.to_vec())
+                    .collect::<Vec<_>>()
+            })
+            .collect::<Vec<_>>();
+
+        let mut acc = None;
+        for i in 0..number_of_rounds {
+            for _ in 0..window_size {
+                if let Some(_acc) = acc {
+                    acc = Some(self.double_incomplete(stack, &_acc));
+                }
+            }
+
+            let mut chain = Vec::with_capacity(tables.len() + 1);
+            if let Some(acc) = acc {
+                chain.push(acc)
+            }
+
+            for (table, windowed) in tables.iter().zip(scalars.iter()) {
+                let selector = &windowed[i];
+                let to_add = self.select_multi(stack, selector, table);
                 chain.push(to_add);
             }
             acc = Some(self.add_multi(stack, &chain[..]));
         }
 
-        self.sub_incomplete(stack, &acc.unwrap(), &correction.unwrap())
+        self.sub_incomplete(stack, &acc.unwrap(), &correction)
     }
 
-    // fn assign_incremental_table<Stack: SecondDegreeChip<C::Scalar> + FirstDegreeChip<C::Scalar>>(
-    //     &self,
-    //     stack: &mut Stack,
+    pub fn msm_sliding_horizontal_rom<
+        Stack: SecondDegreeChip<C::Scalar>
+            + FirstDegreeChip<C::Scalar>
+            + ROMChip<C::Scalar, NUMBER_OF_LIMBS>,
+    >(
+        &self,
+        stack: &mut Stack,
+        tag: C::Scalar,
+        points: &[Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>],
+        scalars: &[Witness<C::Scalar>],
+        window_size: usize,
+    ) -> Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE> {
+        let number_of_points = points.len();
+        assert!(number_of_points > 0);
+        assert_eq!(number_of_points, scalars.len());
 
-    //     aux: &Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>,
-    //     point: &Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>,
-    //     window_size: usize,
-    // ) -> Vec<Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>> {
-    //     let table_size = 1 << window_size;
-    //     let mut table = vec![aux.clone()];
-    //     for i in 0..(table_size - 1) {
-    //         table.push(self.add_incomplete(stack, &table[i], point));
-    //     }
-    //     table
-    // }
+        let number_of_rounds = div_ceil!(C::Scalar::NUM_BITS as usize, window_size);
+        let table_size = 1 << window_size;
 
-    // pub fn msm_sliding_horizontal<
-    //     Stack: SecondDegreeChip<C::Scalar> + FirstDegreeChip<C::Scalar> + SelectChip<C::Scalar>,
-    // >(
-    //     &self,
-    //     stack: &mut Stack,
+        let mut aux_pow2 = self.assign_point(stack, self.aux_generator);
+        let mut aux_round_acc = aux_pow2.clone();
 
-    //     points: &[Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>],
-    //     scalars: &[Witness<C::Scalar>],
-    //     window_size: usize,
-    // ) -> Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE> {
-    //     let number_of_points = points.len();
-    //     assert!(number_of_points > 0);
-    //     assert_eq!(number_of_points, scalars.len());
+        points.iter().enumerate().for_each(|(point_idx, point)| {
+            let address_base = C::Scalar::from((2 * table_size * point_idx) as u64);
+            let mut prev = aux_pow2.clone();
 
-    //     // TODO: correction calculation must be enforced
-    //     let correction = self.aux_generator.map(|aux_generator| {
-    //         let mut aux = aux_generator.to_curve();
-    //         (0..number_of_points)
-    //             .fold(C::CurveExt::identity(), |acc, _| {
-    //                 let aux_table = binary_table::<C>(&C::identity(), &aux, window_size);
-    //                 aux = aux.double();
-    //                 acc + mul_fix::<C>(&aux_table[..], &C::ScalarExt::ZERO, window_size)
-    //             })
-    //             .to_affine()
-    //             .neg()
-    //     });
+            self.write_rom(stack, tag, address_base, table_size, &prev);
 
-    //     let mut aux = self.assign_point(stack, self.aux_generator);
-    //     let correction = self.assign_point(stack, correction);
+            // let mut table = vec![aux_pow2.clone()];
+            for table_idx in 1..table_size {
+                prev = self.add_incomplete(stack, &prev, point);
 
-    //     let scalars = scalars
-    //         .iter()
-    //         .map(|scalar| {
-    //             let (_scalar, bits) =
-    //                 stack.decompose_generic(scalar.value(), C::Scalar::NUM_BITS as usize, 1);
+                self.write_rom(
+                    stack,
+                    tag,
+                    address_base + C::Scalar::from(table_idx as u64),
+                    table_size,
+                    &prev,
+                );
+            }
 
-    //             stack.equal(&_scalar, scalar);
+            if point_idx != number_of_points - 1 {
+                aux_pow2 = self.double_incomplete(stack, &aux_pow2);
+                aux_round_acc = self.add_incomplete(stack, &aux_round_acc, &aux_pow2);
+            }
+        });
 
-    //             bits.chunks(window_size)
-    //                 .rev()
-    //                 .map(|chunk| chunk.to_vec())
-    //                 .collect::<Vec<_>>()
-    //         })
-    //         .collect::<Vec<_>>();
+        let mut correction = aux_round_acc.clone();
+        for _ in 1..number_of_rounds {
+            for _ in 0..window_size {
+                correction = self.double_incomplete(stack, &correction);
+            }
+            correction = self.add_incomplete(stack, &correction, &aux_round_acc);
+        }
 
-    //     let tables: Vec<Vec<Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>>> = points
-    //         .iter()
-    //         .enumerate()
-    //         .map(|(i, point)| {
-    //             let table = self.assign_incremental_table(stack, &aux, point, window_size);
-    //             if i != number_of_points - 1 {
-    //                 aux = self.double_incomplete(stack, &aux);
-    //             }
-    //             table
-    //         })
-    //         .collect();
+        let scalars = scalars
+            .iter()
+            .map(|scalar| {
+                let (_scalar, mut limbs) = stack.decompose_generic(
+                    scalar.value(),
+                    C::Scalar::NUM_BITS as usize,
+                    window_size,
+                );
 
-    //     // let mut acc = self.select_multi(stack, &scalars[0][0], &tables[0]);
+                stack.equal(&_scalar, scalar);
 
-    //     // for (table, windowed) in tables.iter().skip(1).zip(scalars.iter().skip(1)) {
-    //     //     let selector = &windowed[0];
-    //     //     let to_add = self.select_multi(stack, selector, table);
+                limbs.reverse();
+                limbs
+            })
+            .collect::<Vec<_>>();
 
-    //     //     acc = self.add_incomplete(stack, &acc, &to_add);
-    //     // }
+        let mut acc = None;
+        for i in 0..number_of_rounds {
+            for _ in 0..window_size {
+                if let Some(_acc) = acc {
+                    acc = Some(self.double_incomplete(stack, &_acc));
+                }
+            }
 
-    //     // let number_of_windows = div_ceil!(C::Scalar::NUM_BITS as usize, window_size);
-    //     // for i in 1..number_of_windows {
-    //     //     for _ in 0..window_size {
-    //     //         acc = self.double_incomplete(stack, &acc);
-    //     //     }
+            let mut chain = Vec::with_capacity(table_size + 1);
 
-    //     //     for (table, windowed) in tables.iter().zip(scalars.iter()) {
-    //     //         let selector = &windowed[i];
-    //     //         let to_add = self.select_multi(stack, selector, table);
-    //     //         acc = self.add_incomplete(stack, &acc, &to_add);
-    //     //     }
-    //     // }
+            if let Some(acc) = acc {
+                chain.push(acc)
+            }
 
-    //     // let mut acc = self.select_multi(stack, &scalars[0][0], &tables[0]);
+            for (point_idx, scalar) in scalars.iter().enumerate() {
+                let selector = &scalar[i];
+                let address_base = C::Scalar::from((2 * table_size * point_idx) as u64);
+                let to_add = self.read_rom(stack, tag, address_base, selector, table_size);
+                chain.push(to_add);
+            }
+            acc = Some(self.add_multi(stack, &chain[..]));
+        }
 
-    //     // for (table, windowed) in tables.iter().skip(1).zip(scalars.iter().skip(1)) {
-    //     //     let selector = &windowed[0];
-    //     //     let to_add = self.select_multi(stack, selector, table);
-
-    //     //     acc = self.add_incomplete(stack, &acc, &to_add);
-    //     // }
-
-    //     let mut acc = None;
-
-    //     let number_of_windows = div_ceil!(C::Scalar::NUM_BITS as usize, window_size);
-    //     for i in 0..number_of_windows {
-    //         for _ in 0..window_size {
-    //             // acc = self.double_incomplete(stack, &acc);
-    //             if let Some(_acc) = acc {
-    //                 acc = Some(self.double_incomplete(stack, &_acc));
-    //             }
-    //         }
-
-    //         let mut chain = Vec::with_capacity(tables.len() + 1);
-    //         if let Some(acc) = acc {
-    //             chain.push(acc)
-    //         }
-
-    //         for (table, windowed) in tables.iter().zip(scalars.iter()) {
-    //             let selector = &windowed[i];
-    //             let to_add = self.select_multi(stack, selector, table);
-    //             chain.push(to_add);
-
-    //             // acc = self.add_incomplete(stack, &acc, &to_add);
-    //         }
-    //         acc = Some(self.add_multi(stack, &chain[..]));
-    //     }
-
-    //     self.add_incomplete(stack, &acc.unwrap(), &correction)
-    // }
+        self.sub_incomplete(stack, &acc.unwrap(), &correction)
+    }
 }

@@ -6,7 +6,6 @@ use integer::integer::{ConstantInteger, Integer};
 pub mod base_field_ecc;
 #[cfg(test)]
 mod tests;
-mod utils;
 
 #[derive(Clone, Debug)]
 pub struct Point<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const LIMB_SIZE: usize>
