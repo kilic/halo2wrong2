@@ -28,7 +28,7 @@ impl<F: PrimeField, const W: usize, const BIT_SIZE: usize> RangeTableLayout<F>
         #[cfg(feature = "info")]
         {
             println!("---");
-            println!("* in place sparse range table: {:?}", BIT_SIZE);
+            println!("* in place sparse range table: {BIT_SIZE:?}");
             println!();
         }
         layout_range_table(ly_ctx, self.value_table, BIT_SIZE)
@@ -86,7 +86,7 @@ impl<F: PrimeField, const W: usize, const BIT_SIZE: usize> RangeInPlace<F, W>
         for (rem_size, witnesses) in remainings.iter() {
             let u = BIT_SIZE.checked_sub(*rem_size).unwrap();
             assert!(u > 0);
-            let factor = (F::ONE + F::ONE).pow(&[u as u64]);
+            let factor = (F::ONE + F::ONE).pow([u as u64]);
 
             for witnesses in witnesses.chunks(W) {
                 ctx.fixed(self.scale, factor)?;

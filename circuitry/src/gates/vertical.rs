@@ -59,14 +59,11 @@ impl<F: PrimeField, R: RangeInPlace<F, 1>> VerticalGate<F, R> {
 
         // prevent double composition config
 
-        assert!(self
-            .selectors
-            .insert(Selectors::Eq, eq_selector.clone())
-            .is_none());
+        assert!(self.selectors.insert(Selectors::Eq, eq_selector).is_none());
 
         assert!(self
             .selectors
-            .insert(Selectors::Acc, acc_selector.clone())
+            .insert(Selectors::Acc, acc_selector)
             .is_none());
 
         meta.create_gate("vertical composition w/o equality", |meta| {
@@ -86,7 +83,7 @@ impl<F: PrimeField, R: RangeInPlace<F, 1>> VerticalGate<F, R> {
 
             let term = constant * advice;
 
-            let expression_acc = acc_selector * (acc_prev.clone() + term - acc.clone());
+            let expression_acc = acc_selector * (acc_prev + term - acc.clone());
             let expression_eq = eq_selector * acc;
 
             vec![expression_acc, expression_eq]
@@ -101,7 +98,7 @@ impl<F: PrimeField, R: RangeInPlace<F, 1>> VerticalGate<F, R> {
 
         assert!(self
             .selectors
-            .insert(Selectors::Eq, selection_selector.clone())
+            .insert(Selectors::Eq, selection_selector)
             .is_some());
 
         meta.create_gate("selection", |meta| {
@@ -114,8 +111,7 @@ impl<F: PrimeField, R: RangeInPlace<F, 1>> VerticalGate<F, R> {
 
             // c*w0 - c*w1 + w1 - res = 0
             // c * (w0 - w1) + w1 - res = 0
-            let expression =
-                cond.clone() * (w0.clone() - w1.clone()) + w1.clone() - selected.clone();
+            let expression = cond * (w0 - w1.clone()) + w1 - selected;
             Constraints::with_selector(selector, vec![expression])
         });
     }
@@ -143,16 +139,16 @@ impl<F: PrimeField + Ord, R: RangeInPlace<F, 1>> GateLayout<F, Vec<Selection<F>>
                 for op in e.iter() {
                     ctx.enable(*self.selectors.get(&Selectors::Select).unwrap())?;
 
-                    let cell = ctx.advice(self.acc.into(), op.w0.value())?;
+                    let cell = ctx.advice(self.acc, op.w0.value())?;
                     ctx.copy_chain(op.w0.id.expect("should be copiable"), cell)?;
-                    let cell = ctx.advice(self.advice.into(), op.selected.value())?;
+                    let cell = ctx.advice(self.advice, op.selected.value())?;
                     ctx.copy_chain(op.selected.id.expect("should be copiable"), cell)?;
 
                     ctx.next();
 
-                    let cell = ctx.advice(self.acc.into(), op.w1.value())?;
+                    let cell = ctx.advice(self.acc, op.w1.value())?;
                     ctx.copy_chain(op.w1.id.expect("should be copiable"), cell)?;
-                    let cell = ctx.advice(self.advice.into(), op.cond.value())?;
+                    let cell = ctx.advice(self.advice, op.cond.value())?;
                     ctx.copy_chain(op.cond.id.expect("should be copiable"), cell)?;
 
                     ctx.next();
@@ -169,7 +165,7 @@ impl<F: PrimeField + Ord, R: RangeInPlace<F, 1>> GateLayout<F, Vec<Selection<F>>
 
         #[cfg(feature = "info")]
         {
-            println!("* * rows: {}", _offset);
+            println!("* * rows: {_offset}");
             println!();
         }
 
@@ -307,7 +303,7 @@ impl<F: PrimeField + Ord, R: RangeInPlace<F, 1>> GateLayout<F, Vec<FirstDegreeCo
 
         #[cfg(feature = "info")]
         {
-            println!("* * rows: {}", _offset);
+            println!("* * rows: {_offset}");
             println!();
         }
 
@@ -338,7 +334,7 @@ impl<F: PrimeField + Ord, R: RangeInPlace<F, 1>> GateLayout<F, Vec<Witness<F>>>
             let sorted = sort_by_size(&e[..], None);
             let n: usize = sorted.values().map(|e| e.len()).sum();
             println!("---");
-            println!("* number of ranged witnesses: {}", n);
+            println!("* number of ranged witnesses: {n}");
             for (bit_size, witnesses) in sorted.iter() {
                 println!("* * bit_size: {} occurs: {}", bit_size, witnesses.len());
             }

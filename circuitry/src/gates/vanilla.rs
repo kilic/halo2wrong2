@@ -259,7 +259,7 @@ impl<F: PrimeField + Ord> GateLayout<F, Vec<FirstDegreeComposition<F>>> for Vani
 
         #[cfg(feature = "info")]
         {
-            println!("* * rows: {}", _offset);
+            println!("* * rows: {_offset}");
             println!();
         }
 
@@ -328,7 +328,7 @@ impl<F: PrimeField + Ord> GateLayout<F, Vec<SecondDegreeComposition<F>>> for Van
 
         #[cfg(feature = "info")]
         {
-            println!("* * rows: {}", _offset);
+            println!("* * rows: {_offset}");
             println!();
         }
 
@@ -363,7 +363,7 @@ impl<F: PrimeField + Ord> GateLayout<F, Vec<Selection<F>>> for VanillaGate<F> {
 
         #[cfg(feature = "info")]
         {
-            println!("* * rows: {}", _offset);
+            println!("* * rows: {_offset}");
             println!();
         }
 

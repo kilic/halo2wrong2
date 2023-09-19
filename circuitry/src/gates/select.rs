@@ -58,8 +58,7 @@ impl<F: PrimeField + Ord> SelectGate<F> {
             let w1 = meta.query_advice(self.w1, Rotation::cur());
             let selected = meta.query_advice(self.selected, Rotation::cur());
             let selector = meta.query_selector(self.selector);
-            let expression =
-                cond.clone() * (w0.clone() - w1.clone()) + w1.clone() - selected.clone();
+            let expression = cond * (w0 - w1.clone()) + w1 - selected;
             Constraints::with_selector(selector, vec![expression])
         });
     }

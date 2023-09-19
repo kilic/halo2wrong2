@@ -71,7 +71,7 @@ impl<F: PrimeField + Ord, const W: usize> ROMGate<F, W> {
 
             let query_selector = meta.query_selector(query_selector);
 
-            let argument = query
+            query
                 .into_iter()
                 .zip(table.into_iter())
                 .chain(std::iter::once((
@@ -80,9 +80,7 @@ impl<F: PrimeField + Ord, const W: usize> ROMGate<F, W> {
                 )))
                 .chain(std::iter::once((query_tag, table_tag)))
                 .map(|(query, table)| (query_selector.clone() * query, table)) //
-                .collect::<Vec<_>>();
-
-            argument
+                .collect::<Vec<_>>()
         });
 
         Self {
@@ -121,8 +119,8 @@ impl<F: PrimeField + Ord, const W: usize> GateLayout<F, Vec<MemoryOperation<F, W
                     MemoryOperation::Read { .. } => n_read += 1,
                 }
             }
-            println!("* * n_write: {}", n_write);
-            println!("* * n_read: {}", n_read);
+            println!("* * n_write: {n_write}");
+            println!("* * n_read: {n_read}");
             println!();
         }
 
@@ -276,7 +274,7 @@ mod test {
             let values = (0..W).map(|_| meta.advice_column()).collect::<Vec<_>>();
 
             let table_values = values.clone();
-            let query_values = values.clone();
+            let query_values = values;
             let query_fraction = meta.advice_column();
             let rom_gate = ROMGate::configure(
                 meta,
@@ -388,7 +386,6 @@ mod test {
                 },
             )?;
 
-            println!("offset: {:#?}", _offset);
             Ok(())
         }
     }

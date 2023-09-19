@@ -64,7 +64,7 @@ impl<F: PrimeField, const W: usize> RangeTableLayout<F> for RangeInPlaceGate<F, 
         #[cfg(feature = "info")]
         {
             println!("---");
-            println!("* in place range table: {:?}", bit_sizes);
+            println!("* in place range table: {bit_sizes:?}");
             println!();
         }
         layout_tagged_range_tables(ly_ctx, self.tag_table, self.value_table, bit_sizes)

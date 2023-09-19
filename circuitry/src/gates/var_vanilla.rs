@@ -259,7 +259,7 @@ impl<F: PrimeField + Ord, const W: usize> GateLayout<F, Vec<FirstDegreeCompositi
 
         #[cfg(feature = "info")]
         {
-            println!("* * rows: {}", _offset);
+            println!("* * rows: {_offset}");
             println!();
         }
 
@@ -330,7 +330,7 @@ impl<F: PrimeField + Ord, const W: usize> GateLayout<F, Vec<SecondDegreeComposit
 
         #[cfg(feature = "info")]
         {
-            println!("* * rows: {}", _offset);
+            println!("* * rows: {_offset}");
             println!();
         }
 
@@ -367,7 +367,7 @@ impl<F: PrimeField + Ord, const W: usize> GateLayout<F, Vec<Selection<F>>>
 
         #[cfg(feature = "info")]
         {
-            println!("* * rows: {}", _offset);
+            println!("* * rows: {_offset}");
             println!();
         }
 
@@ -582,7 +582,7 @@ impl<F: PrimeField, const W: usize> VarVanillaGate<F, W> {
                     // Some(
                     chunk
                         .iter()
-                        .map(|e| Some(e))
+                        .map(Some)
                         .chain(std::iter::repeat(None))
                         .take(w_first_degree)
                         .collect::<Vec<_>>()

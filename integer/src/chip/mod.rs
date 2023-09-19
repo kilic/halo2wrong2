@@ -352,7 +352,7 @@ impl<
         // written value is asumed to be in remeinder range
         let max_values = self.rns.max_values(Range::Remainder);
 
-        Integer::new(&limbs.try_into().unwrap(), &max_values, big, native)
+        Integer::new(&limbs, &max_values, big, native)
     }
 
     // pub fn assert_bit(

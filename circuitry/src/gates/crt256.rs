@@ -397,7 +397,7 @@
 
 //             println!("* * mul: {mul}");
 //             println!("* * red: {red}");
-//             println!("* * rows: {}", _offset);
+//             println!("* * rows: {_offset}");
 //             println!();
 //         }
 

@@ -548,7 +548,7 @@ impl<
 
                 #[cfg(feature = "more-info")]
                 {
-                    println!("negmuldivadd carry: {}", carry_max);
+                    println!("negmuldivadd carry: {carry_max}");
                 };
 
                 let carry_tmp_1 = &stack
@@ -676,7 +676,7 @@ impl<
 
                 #[cfg(feature = "more-info")]
                 {
-                    println!("negmuldivadd carry: {}", carry_max);
+                    println!("negmuldivadd carry: {carry_max}");
                 };
 
                 let carry_tmp_1 = &stack
@@ -781,7 +781,7 @@ impl<
 
             #[cfg(feature = "more-info")]
             {
-                println!("div carry: {}", carry_max);
+                println!("div carry: {carry_max}");
             };
 
             let carry_tmp_1 = &stack

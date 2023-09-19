@@ -47,7 +47,7 @@ impl<
         // r <> 0 <-> r % 2 ^ 64 <> 0 \/ r % native_modulus <> 0
         // r <> 0 <-> invert(r.limb(0)) \/ invert(r.native())
         let cond_zero_0 = stack.is_zero(&w0.limbs[0]);
-        let cond_zero_1 = stack.is_zero(&native);
+        let cond_zero_1 = stack.is_zero(native);
         // one of them might be succeeded, i.e. cond_zero_0 * cond_zero_1 = 0
         let must_be_zero = stack.mul(&cond_zero_0, &cond_zero_1);
         stack.assert_zero(&must_be_zero);

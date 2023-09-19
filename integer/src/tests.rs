@@ -314,7 +314,7 @@ fn make_stack<
 
         let divisor = &ch.range(stack, divisor, Range::Operand);
         let to_add = ch.range(stack, to_add, Range::Remainder);
-        let u1 = ch.neg_mul_add_div(stack, a0, a1, &divisor, &to_add);
+        let u1 = ch.neg_mul_add_div(stack, a0, a1, divisor, &to_add);
 
         let res = a0
             .value()

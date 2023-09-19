@@ -76,16 +76,14 @@ pub(crate) fn layout_range_table<F: PrimeField, L: Layouter<F>>(
     ly_ctx.layouter.assign_table(
         || "",
         |mut table| {
-            let mut offset = 0;
             let table_values: Vec<F> = (0..1 << bit_size).map(|e| F::from(e)).collect();
-            for value in table_values.iter() {
+            for (offset, value) in table_values.iter().enumerate() {
                 table.assign_cell(
                     || "table value",
                     value_table,
                     offset,
                     || Value::known(*value),
                 )?;
-                offset += 1;
             }
             Ok(())
         },

@@ -64,7 +64,7 @@ impl<
                 if let Some(carry) = carry {
                     terms.push(carry);
                 }
-                let carry_tmp_0: Witness<N> = stack.compose(&terms[..], N::ZERO).into();
+                let carry_tmp_0: Witness<N> = stack.compose(&terms[..], N::ZERO);
 
                 let carry_tmp_1 = &stack
                     .decompose_generic(carry_tmp_0.value(), carry_max as usize, SUBLIMB_SIZE)
@@ -128,7 +128,7 @@ impl<
                 if let Some(carry) = carry {
                     terms.push(carry);
                 }
-                let carry_tmp_0: Witness<N> = stack.compose(&terms[..], N::ZERO).into();
+                let carry_tmp_0: Witness<N> = stack.compose(&terms[..], N::ZERO);
 
                 let carry_tmp_1 = &stack
                     .decompose_generic(carry_tmp_0.value(), carry_max as usize, SUBLIMB_SIZE)

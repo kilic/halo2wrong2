@@ -58,7 +58,7 @@ impl<F: PrimeField> FirstDegreeComposition<F> {
         }
         let mut decision = true;
         for term in terms.iter().rev().skip(1) {
-            decision = decision & term.witness.range.is_some()
+            decision &= term.witness.range.is_some()
         }
         decision
     }
@@ -66,10 +66,6 @@ impl<F: PrimeField> FirstDegreeComposition<F> {
     pub fn is_range_demoposition(&self) -> bool {
         // Self::_is_range_demoposition(&self.terms)
         self.is_range_decomposition
-    }
-
-    pub fn len(&self) -> usize {
-        self.terms.len()
     }
 
     pub fn has_constant(&self) -> bool {

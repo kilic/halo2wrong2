@@ -56,7 +56,7 @@ impl<
 
                 // update round aux
                 round_aux_acc = if let Some(round_aux_acc) = &round_aux_acc {
-                    Some(self.add_incomplete(stack, &round_aux, &round_aux_acc))
+                    Some(self.add_incomplete(stack, &round_aux, round_aux_acc))
                 } else {
                     Some(round_aux.clone())
                 };
@@ -90,10 +90,10 @@ impl<
         for round in 0..(C::Scalar::NUM_BITS as usize) {
             let mut chain = Vec::with_capacity(tables.len() + 1);
 
-            acc.as_mut().map(|acc| {
-                *acc = self.double_incomplete(stack, &acc);
+            if let Some(acc) = acc.as_mut() {
+                *acc = self.double_incomplete(stack, acc);
                 chain.push(acc.deref().clone());
-            });
+            }
 
             for (_, (table, scalars)) in tables.iter().zip(scalars.chunks(window_size)).enumerate()
             {
@@ -144,7 +144,7 @@ impl<
                     tag,
                     address_base_chunk,
                     table_size,
-                    &table.last().unwrap(),
+                    table.last().unwrap(),
                 );
 
                 for (i, point) in chunk.iter().enumerate() {
@@ -152,19 +152,13 @@ impl<
                         let address_base =
                             C::Scalar::from(((1 << i) + j) as u64) + address_base_chunk;
                         table.push(self.add_incomplete(stack, &table[j], point));
-                        self.write_rom(
-                            stack,
-                            tag,
-                            address_base,
-                            table_size,
-                            &table.last().unwrap(),
-                        );
+                        self.write_rom(stack, tag, address_base, table_size, table.last().unwrap());
                     }
                 }
 
                 // update round aux
                 round_aux_acc = if let Some(acc_round_aux) = &round_aux_acc {
-                    Some(self.add_incomplete(stack, &round_aux, &acc_round_aux))
+                    Some(self.add_incomplete(stack, &round_aux, acc_round_aux))
                 } else {
                     Some(round_aux.clone())
                 };
@@ -195,10 +189,10 @@ impl<
         for round in 0..(C::Scalar::NUM_BITS as usize) {
             let mut chain = Vec::with_capacity(table_size + 1);
 
-            acc.as_mut().map(|acc| {
-                *acc = self.double_incomplete(stack, &acc);
+            if let Some(acc) = acc.as_mut() {
+                *acc = self.double_incomplete(stack, acc);
                 chain.push(acc.deref().clone());
-            });
+            };
 
             for (chunk_idx, scalars) in scalars.chunks(window_size).enumerate() {
                 let selector = scalars

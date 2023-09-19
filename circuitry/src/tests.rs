@@ -111,7 +111,7 @@ mod test_composition {
 
     use super::*;
 
-    fn make_stack_first_degree<'a, F: PrimeField + Ord, const LIMB_SIZE: usize>(
+    fn make_stack_first_degree<F: PrimeField + Ord, const LIMB_SIZE: usize>(
         stack: &mut Stack<F, 0>,
         use_constants: bool,
     ) {
@@ -150,7 +150,7 @@ mod test_composition {
         }
     }
 
-    fn make_stack_second_degree<'a, F: PrimeField + Ord>(stack: &mut Stack<F, 0>) {
+    fn make_stack_second_degree<F: PrimeField + Ord>(stack: &mut Stack<F, 0>) {
         let rand = || F::random(OsRng);
 
         // combination second degree
@@ -860,7 +860,7 @@ mod test_rom {
             let vanilla_gate = VanillaGate::new(meta);
             vanilla_gate.configure(meta);
             let query_values = vanilla_gate.advice_colums();
-            let table_values = query_values.clone();
+            let table_values = query_values;
             let query_fraction = meta.advice_column();
 
             let rom_gate = ROMGate::configure(meta, query_fraction, query_values, table_values);

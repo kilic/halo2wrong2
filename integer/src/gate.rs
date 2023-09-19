@@ -1,13 +1,9 @@
 use std::marker::PhantomData;
 
-use circuitry::{
-    utils::{big_to_fe, big_to_fe_unsafe, decompose, modulus},
-    witness::{Composable, Witness},
-    RegionCtx,
-};
+use circuitry::utils::{big_to_fe, big_to_fe_unsafe, decompose, modulus};
 use ff::PrimeField;
 use halo2::{
-    plonk::{Advice, Column, ConstraintSystem, Constraints, Error, Expression, Selector},
+    plonk::{Advice, Column, ConstraintSystem, Constraints, Expression, Selector},
     poly::Rotation,
 };
 use num_bigint::BigUint;
@@ -36,7 +32,7 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const LIMB_SIZE
         let mul_selector = meta.selector();
         let red_selector = meta.selector();
         Self {
-            advice: advice.clone(),
+            advice: *advice,
             mul_selector,
             red_selector,
             _marker: PhantomData,
@@ -67,7 +63,7 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const LIMB_SIZE
                 .into_iter()
                 .enumerate()
                 .fold(Expression::Constant(N::ZERO), |acc, (i, limb)| {
-                    acc + limb * base.pow(&[i as u64])
+                    acc + limb * base.pow([i as u64])
                 })
         };
 
@@ -113,7 +109,7 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const LIMB_SIZE
             let t = result
                 .clone()
                 .into_iter()
-                .zip(to_sub.clone().into_iter())
+                .zip(to_sub.into_iter())
                 .enumerate()
                 .map(|(i, (result, to_sub))| {
                     let t = w0
@@ -225,104 +221,104 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const LIMB_SIZE
     }
 }
 
-impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const LIMB_SIZE: usize>
-    CRTGate<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>
-{
-    pub fn mul(
-        &self,
-        ctx: &mut RegionCtx<'_, '_, N>,
-        w0: &[Witness<N>; NUMBER_OF_LIMBS],
-        w1: &[Witness<N>; NUMBER_OF_LIMBS],
-        result: &[Witness<N>; NUMBER_OF_LIMBS],
-        quotient: &[Witness<N>; NUMBER_OF_LIMBS],
-        carries: &[Witness<N>; NUMBER_OF_LIMBS],
-        to_sub: &[Witness<N>; NUMBER_OF_LIMBS],
-    ) -> Result<(), Error> {
-        ctx.enable(self.mul_selector)?;
+// impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const LIMB_SIZE: usize>
+//     CRTGate<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>
+// {
+//     pub fn mul(
+//         &self,
+//         ctx: &mut RegionCtx<'_, '_, N>,
+//         w0: &[Witness<N>; NUMBER_OF_LIMBS],
+//         w1: &[Witness<N>; NUMBER_OF_LIMBS],
+//         result: &[Witness<N>; NUMBER_OF_LIMBS],
+//         quotient: &[Witness<N>; NUMBER_OF_LIMBS],
+//         carries: &[Witness<N>; NUMBER_OF_LIMBS],
+//         to_sub: &[Witness<N>; NUMBER_OF_LIMBS],
+//     ) -> Result<(), Error> {
+//         ctx.enable(self.mul_selector)?;
 
-        let _ = w0
-            .iter()
-            .zip(self.advice.into_iter())
-            .map(|(limb, column)| ctx.advice(column, limb.value()))
-            .collect::<Result<Vec<_>, Error>>()?;
-        ctx.next();
+//         let _ = w0
+//             .iter()
+//             .zip(self.advice.into_iter())
+//             .map(|(limb, column)| ctx.advice(column, limb.value()))
+//             .collect::<Result<Vec<_>, Error>>()?;
+//         ctx.next();
 
-        let _ = w1
-            .iter()
-            .zip(self.advice.into_iter())
-            .map(|(limb, column)| ctx.advice(column, limb.value()))
-            .collect::<Result<Vec<_>, Error>>()?;
-        ctx.next();
+//         let _ = w1
+//             .iter()
+//             .zip(self.advice.into_iter())
+//             .map(|(limb, column)| ctx.advice(column, limb.value()))
+//             .collect::<Result<Vec<_>, Error>>()?;
+//         ctx.next();
 
-        let _ = result
-            .iter()
-            .zip(self.advice.into_iter())
-            .map(|(limb, column)| ctx.advice(column, limb.value()))
-            .collect::<Result<Vec<_>, Error>>()?;
-        ctx.next();
+//         let _ = result
+//             .iter()
+//             .zip(self.advice.into_iter())
+//             .map(|(limb, column)| ctx.advice(column, limb.value()))
+//             .collect::<Result<Vec<_>, Error>>()?;
+//         ctx.next();
 
-        let _ = quotient
-            .iter()
-            .zip(self.advice.into_iter())
-            .map(|(limb, column)| ctx.advice(column, limb.value()))
-            .collect::<Result<Vec<_>, Error>>()?;
-        ctx.next();
+//         let _ = quotient
+//             .iter()
+//             .zip(self.advice.into_iter())
+//             .map(|(limb, column)| ctx.advice(column, limb.value()))
+//             .collect::<Result<Vec<_>, Error>>()?;
+//         ctx.next();
 
-        let _ = carries
-            .iter()
-            .zip(self.advice.into_iter())
-            .map(|(limb, column)| ctx.advice(column, limb.value()))
-            .collect::<Result<Vec<_>, Error>>()?;
-        ctx.next();
+//         let _ = carries
+//             .iter()
+//             .zip(self.advice.into_iter())
+//             .map(|(limb, column)| ctx.advice(column, limb.value()))
+//             .collect::<Result<Vec<_>, Error>>()?;
+//         ctx.next();
 
-        let _ = to_sub
-            .iter()
-            .zip(self.advice.into_iter())
-            .map(|(limb, column)| ctx.advice(column, limb.value()))
-            .collect::<Result<Vec<_>, Error>>()?;
+//         let _ = to_sub
+//             .iter()
+//             .zip(self.advice.into_iter())
+//             .map(|(limb, column)| ctx.advice(column, limb.value()))
+//             .collect::<Result<Vec<_>, Error>>()?;
 
-        ctx.next();
+//         ctx.next();
 
-        Ok(())
-    }
+//         Ok(())
+//     }
 
-    pub fn reduce(
-        &self,
-        ctx: &mut RegionCtx<'_, '_, N>,
-        w0: &[Witness<N>; NUMBER_OF_LIMBS],
-        result: &[Witness<N>; NUMBER_OF_LIMBS],
-        carries: &[Witness<N>; NUMBER_OF_LIMBS],
-        quotient: &Witness<N>,
-    ) -> Result<(), Error> {
-        ctx.enable(self.red_selector)?;
+//     pub fn reduce(
+//         &self,
+//         ctx: &mut RegionCtx<'_, '_, N>,
+//         w0: &[Witness<N>; NUMBER_OF_LIMBS],
+//         result: &[Witness<N>; NUMBER_OF_LIMBS],
+//         carries: &[Witness<N>; NUMBER_OF_LIMBS],
+//         quotient: &Witness<N>,
+//     ) -> Result<(), Error> {
+//         ctx.enable(self.red_selector)?;
 
-        let _ = w0
-            .iter()
-            .zip(self.advice.into_iter())
-            .map(|(limb, column)| ctx.advice(column, limb.value()))
-            .collect::<Result<Vec<_>, Error>>()?;
-        ctx.next();
+//         let _ = w0
+//             .iter()
+//             .zip(self.advice.into_iter())
+//             .map(|(limb, column)| ctx.advice(column, limb.value()))
+//             .collect::<Result<Vec<_>, Error>>()?;
+//         ctx.next();
 
-        let _ = result
-            .iter()
-            .zip(self.advice.into_iter())
-            .map(|(limb, column)| ctx.advice(column, limb.value()))
-            .collect::<Result<Vec<_>, Error>>()?;
-        ctx.next();
+//         let _ = result
+//             .iter()
+//             .zip(self.advice.into_iter())
+//             .map(|(limb, column)| ctx.advice(column, limb.value()))
+//             .collect::<Result<Vec<_>, Error>>()?;
+//         ctx.next();
 
-        let _ = carries
-            .iter()
-            .zip(self.advice.into_iter())
-            .map(|(limb, column)| ctx.advice(column, limb.value()))
-            .collect::<Result<Vec<_>, Error>>()?;
-        ctx.next();
+//         let _ = carries
+//             .iter()
+//             .zip(self.advice.into_iter())
+//             .map(|(limb, column)| ctx.advice(column, limb.value()))
+//             .collect::<Result<Vec<_>, Error>>()?;
+//         ctx.next();
 
-        ctx.advice(*self.advice.first().unwrap(), quotient.value())?;
-        ctx.next();
+//         ctx.advice(*self.advice.first().unwrap(), quotient.value())?;
+//         ctx.next();
 
-        Ok(())
-    }
-}
+//         Ok(())
+//     }
+// }
 
 // impl<W: PrimeField, N: PrimeField + Ord, const NUMBER_OF_LIMGS: usize, const LIMB_SIZE: usize>
 //     GateLayout<N, &[CRTEnforcement<N, NUMBER_OF_LIMGS>]>
@@ -380,7 +376,7 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const LIMB_SIZE
 
 //             println!("* * mul: {mul}");
 //             println!("* * red: {red}");
-//             println!("* * rows: {}", _offset);
+//             println!("* * rows: {_offset}");
 //             println!();
 //         }
 

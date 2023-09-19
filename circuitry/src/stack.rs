@@ -213,6 +213,7 @@ impl<F: PrimeField + Ord, const MEM_W: usize> Stack<F, MEM_W> {
         tables.sort();
         #[cfg(feature = "synth-sanity")]
         {
+            use crate::gates::range::range_sizes;
             assert_eq!(range_sizes(&self.ranges[..]), tables);
         }
         gate.layout_range_tables(ly, &tables)
@@ -248,12 +249,10 @@ impl<F: PrimeField + Ord, const MEM_W: usize> Chip<FirstDegreeComposition<F>, F>
     fn new_op(&mut self, e: FirstDegreeComposition<F>) {
         if e.is_range_demoposition() {
             self.range_compositions.push(e)
+        } else if e.is_simple() {
+            self.first_degree_ternary_compositions.push(e);
         } else {
-            if e.is_simple() {
-                self.first_degree_ternary_compositions.push(e);
-            } else {
-                self.first_degree_compositions.push(e);
-            }
+            self.first_degree_compositions.push(e);
         }
     }
 }
@@ -297,7 +296,7 @@ impl<F: PrimeField + Ord, const W: usize> ROMChip<F, W> for Stack<F, W> {
         self.new_op(MemoryOperation::Write {
             tag,
             address,
-            values: values.clone(),
+            values: *values,
         });
 
         let values = values.iter().map(|value| value.value()).collect::<Vec<_>>();
@@ -318,7 +317,7 @@ impl<F: PrimeField + Ord, const W: usize> ROMChip<F, W> for Stack<F, W> {
             let address = address_fraction + address_base;
             let memory = self.memory.get(&tag).unwrap();
             let values = memory.get(&address).unwrap();
-            values.clone()
+            *values
         });
         let values = values.transpose_array();
         let values = values
@@ -330,7 +329,7 @@ impl<F: PrimeField + Ord, const W: usize> ROMChip<F, W> for Stack<F, W> {
         self.new_op(MemoryOperation::Read {
             tag,
             address_base,
-            address_fraction: address_fraction.clone(),
+            address_fraction: *address_fraction,
             values,
         });
 

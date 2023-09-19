@@ -143,7 +143,7 @@ impl<
 
         let x = &self
             .ch
-            .read_recover(stack, tag, address_base, &address_fraction);
+            .read_recover(stack, tag, address_base, address_fraction);
         let y = &self
             .ch
             .read_recover(stack, tag, address_base + y_offset, address_fraction);
@@ -305,7 +305,7 @@ impl<
         // c_y = lambda * (a_x - c_x) - a_y
         let t = &self.ch.sub(stack, &a.x, x);
         let y_neg = &self.ch.neg(stack, &a.y);
-        let y = &self.ch.mul_add(stack, t, lambda, &y_neg);
+        let y = &self.ch.mul_add(stack, t, lambda, y_neg);
         Point::new(x, y)
     }
 
@@ -328,7 +328,7 @@ impl<
         // c_y = lambda * (a_x - c_x) - a_y
         let t = &self.ch.sub(stack, &a.x, x);
         let y_neg = &self.ch.neg(stack, &a.y);
-        let y = &self.ch.mul_add(stack, t, lambda, &y_neg);
+        let y = &self.ch.mul_add(stack, t, lambda, y_neg);
 
         Point::new(x, y)
     }
@@ -351,7 +351,7 @@ impl<
         // c_y = lambda * (a_x - c_x) - a_y
         let t = &self.ch.sub(stack, &point.x, x);
         let y_neg = &self.ch.neg(stack, &point.y);
-        let y = &self.ch.mul_add(stack, lambda, t, &y_neg);
+        let y = &self.ch.mul_add(stack, lambda, t, y_neg);
 
         // let denom = &self.ch.mul2(stack, &point.y);
         // let lambda = &self
@@ -380,7 +380,7 @@ impl<
 
         points: &[Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>],
     ) -> Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE> {
-        assert!(points.len() > 0);
+        assert!(!points.is_empty());
         if points.len() == 1 {
             return points[0].clone();
         }
