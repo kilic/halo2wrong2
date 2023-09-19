@@ -105,8 +105,8 @@ pub(crate) fn layout_tagged_range_tables<F: PrimeField, L: Layouter<F>>(
         |mut table| {
             let mut offset = 0;
 
-            table.assign_cell(|| "table tag", tag_table, 0, || Value::known(F::ZERO))?;
-            table.assign_cell(|| "table value", value_table, 0, || Value::known(F::ZERO))?;
+            table.assign_cell(|| "table tag", tag_table, 0, || Value::known(F::zero()))?;
+            table.assign_cell(|| "table value", value_table, 0, || Value::known(F::zero()))?;
             offset += 1;
 
             for bit_size in bit_sizes {

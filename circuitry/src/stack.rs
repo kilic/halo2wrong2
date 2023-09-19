@@ -87,7 +87,7 @@ impl<F: PrimeField + Ord, const MEM_W: usize> Core<F> for Stack<F, MEM_W> {
         let w = self.new_witness(value);
         // TODO: this is tmp workarounde
         // related with exploiting Scaled::dummy
-        self.zero_sum(&[w.add(), w.sub()], F::ZERO);
+        self.zero_sum(&[w.add(), w.sub()], F::zero());
         w
     }
 
@@ -101,7 +101,7 @@ impl<F: PrimeField + Ord, const MEM_W: usize> Core<F> for Stack<F, MEM_W> {
             .entry(bit_size)
             .or_insert_with(|| {
                 (0..div_ceil!(F::NUM_BITS as usize, bit_size))
-                    .map(|i| F::from(2).pow([(bit_size * i) as u64, 0, 0, 0]))
+                    .map(|i| F::from(2).pow_vartime([(bit_size * i) as u64, 0, 0, 0]))
                     .collect()
             })
             .clone()

@@ -73,7 +73,7 @@ impl<F: PrimeField> FirstDegreeComposition<F> {
     }
 
     pub fn has_constant(&self) -> bool {
-        self.constant != F::ZERO
+        self.constant != F::zero()
     }
 }
 

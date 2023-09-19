@@ -48,8 +48,8 @@
 //     }
 
 //     pub fn configure(&self, meta: &mut ConstraintSystem<N>) {
-//         let two = N::ONE + N::ONE;
-//         let base = two.pow([(LIMB_SIZE) as u64]);
+//         let two = N::one() + N::one();
+//         let base = two.pow_vartime([(LIMB_SIZE) as u64]);
 
 //         let binary_modulus = &(BigUint::one() << (LIMB_SIZE * NUMBER_OF_LIMBS));
 //         let wrong_modulus = &modulus::<W>();
@@ -70,8 +70,8 @@
 //             limbs
 //                 .into_iter()
 //                 .enumerate()
-//                 .fold(Expression::Constant(N::ZERO), |acc, (i, limb)| {
-//                     acc + limb * base.pow(&[i as u64])
+//                 .fold(Expression::Constant(N::zero()), |acc, (i, limb)| {
+//                     acc + limb * base.pow_vartime(&[i as u64])
 //                 })
 //         };
 

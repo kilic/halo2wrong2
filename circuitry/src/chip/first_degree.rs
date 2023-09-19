@@ -50,7 +50,7 @@ pub trait FirstDegreeChip<F: PrimeField + Ord>: Chip<FirstDegreeComposition<F>, 
             .chain(std::iter::once(Scaled::sub(&value)))
             .collect();
 
-        self.zero_sum(&terms[..], F::ZERO);
+        self.zero_sum(&terms[..], F::zero());
 
         (value, limbs)
     }
@@ -79,7 +79,7 @@ pub trait FirstDegreeChip<F: PrimeField + Ord>: Chip<FirstDegreeComposition<F>, 
             .chain(std::iter::once(Scaled::sub(&value)))
             .collect();
 
-        self.zero_sum(&terms[..], F::ZERO);
+        self.zero_sum(&terms[..], F::zero());
 
         (value, limbs.try_into().unwrap())
     }
@@ -89,16 +89,16 @@ pub trait FirstDegreeChip<F: PrimeField + Ord>: Chip<FirstDegreeComposition<F>, 
     }
 
     fn assert_zero(&mut self, w0: &Witness<F>) {
-        self.equal_to_constant(w0, F::ZERO)
+        self.equal_to_constant(w0, F::zero())
     }
 
     fn assert_one(&mut self, w0: &Witness<F>) {
-        self.equal_to_constant(w0, F::ONE)
+        self.equal_to_constant(w0, F::one())
     }
 
     fn add(&mut self, w0: &Witness<F>, w1: &Witness<F>) -> Witness<F> {
         let u = self.new_witness(w0.value() + w1.value());
-        self.zero_sum(&[w0.add(), w1.add(), u.sub()], F::ZERO);
+        self.zero_sum(&[w0.add(), w1.add(), u.sub()], F::zero());
         u
     }
 
@@ -111,14 +111,14 @@ pub trait FirstDegreeChip<F: PrimeField + Ord>: Chip<FirstDegreeComposition<F>, 
 
     fn add_scaled(&mut self, w0: &Scaled<F>, w1: &Scaled<F>) -> Witness<F> {
         let u = self.new_witness(w0.value() + w1.value());
-        self.zero_sum(&[*w0, *w1, u.sub()], F::ZERO);
+        self.zero_sum(&[*w0, *w1, u.sub()], F::zero());
 
         u
     }
 
     fn sub(&mut self, w0: &Witness<F>, w1: &Witness<F>) -> Witness<F> {
         let u = self.new_witness(w0.value() - w1.value());
-        self.zero_sum(&[w0.add(), w1.sub(), u.sub()], F::ZERO);
+        self.zero_sum(&[w0.add(), w1.sub(), u.sub()], F::zero());
         u
     }
 
@@ -144,7 +144,7 @@ pub trait FirstDegreeChip<F: PrimeField + Ord>: Chip<FirstDegreeComposition<F>, 
 
     fn scale(&mut self, w: Scaled<F>) -> Witness<F> {
         let u = self.new_witness(w.value());
-        self.zero_sum(&[w, u.sub()], F::ZERO);
+        self.zero_sum(&[w, u.sub()], F::zero());
         u
     }
 
@@ -157,7 +157,7 @@ pub trait FirstDegreeChip<F: PrimeField + Ord>: Chip<FirstDegreeComposition<F>, 
         {
             let result = Scaled::compose(&terms[..], constant_to_add);
             result.map(|must_be_zero| {
-                assert_eq!(must_be_zero, F::ZERO);
+                assert_eq!(must_be_zero, F::zero());
             });
         }
 

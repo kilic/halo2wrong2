@@ -82,7 +82,7 @@ impl<F: PrimeField, R: RangeInPlace<F, 1>> VerticalGate<F, R> {
             // let mul_advice = constant.clone() * advice.clone();
             // let add_advice = constant.clone() + advice.clone();
             // let term = eq_selector.clone() * add_advice
-            //     + (Expression::Constant(F::ONE) - eq_selector.clone()) * mul_advice;
+            //     + (Expression::Constant(F::one()) - eq_selector.clone()) * mul_advice;
 
             let term = constant * advice;
 
@@ -217,10 +217,10 @@ impl<F: PrimeField + Ord, R: RangeInPlace<F, 1>> GateLayout<F, Vec<FirstDegreeCo
 
                 for composition in e.iter() {
                     let constant = composition.constant;
-                    assert_eq!(constant, F::ZERO, "no constant addition in vertical gate");
+                    assert_eq!(constant, F::zero(), "no constant addition in vertical gate");
 
                     let n = composition.terms.len();
-                    let mut acc = Value::known(F::ZERO);
+                    let mut acc = Value::known(F::zero());
 
                     // a0 | a0
                     // a1 | a0 + a1
@@ -234,7 +234,7 @@ impl<F: PrimeField + Ord, R: RangeInPlace<F, 1>> GateLayout<F, Vec<FirstDegreeCo
                     // this is an edge case that we exploit using as simple assignment
                     if composition.terms.len() == 1 {
                         let term = composition.terms.first().unwrap();
-                        assert_eq!(term.factor, F::ONE);
+                        assert_eq!(term.factor, F::one());
                         let witness = term.witness;
                         // assign limb
                         let cell = ctx.advice(self.advice, witness.value())?;
@@ -268,7 +268,7 @@ impl<F: PrimeField + Ord, R: RangeInPlace<F, 1>> GateLayout<F, Vec<FirstDegreeCo
                         if is_last {
                             // expect zero at the last accumulator
                             ctx.enable(*self.selectors.get(&Selectors::Eq).unwrap())?;
-                            assert_eq!(scale, -F::ONE, "don't scale the composition result");
+                            assert_eq!(scale, -F::one(), "don't scale the composition result");
                         } else {
                             // open range gate if needed
                             if let Some(range) = witness.range {
@@ -292,7 +292,7 @@ impl<F: PrimeField + Ord, R: RangeInPlace<F, 1>> GateLayout<F, Vec<FirstDegreeCo
                         {
                             if is_last {
                                 acc.map(|acc| {
-                                    assert_eq!(acc, F::ZERO);
+                                    assert_eq!(acc, F::zero());
                                 });
                             }
                         }

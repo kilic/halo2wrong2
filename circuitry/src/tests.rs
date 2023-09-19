@@ -16,7 +16,6 @@ use crate::{
 
 use std::marker::PhantomData;
 
-use ff::FromUniformBytes;
 use halo2::{
     circuit::{Layouter, SimpleFloorPlanner},
     dev::MockProver,
@@ -54,7 +53,7 @@ pub fn rand_value_in_range<F: PrimeField>(bit_size: usize) -> Value<F> {
 
 impl<F: PrimeField + Ord, const MEM_W: usize> Stack<F, MEM_W> {
     pub(crate) fn _assign_witness(&mut self, w: &Witness<F>) {
-        let e = FirstDegreeComposition::new(vec![w.add(), w.sub()], F::ZERO);
+        let e = FirstDegreeComposition::new(vec![w.add(), w.sub()], F::zero());
         self.first_degree_ternary_compositions.push(e);
     }
 
@@ -76,7 +75,7 @@ impl<F: PrimeField + Ord, const MEM_W: usize> Stack<F, MEM_W> {
 
     // pub(crate) fn _assign_bad_witness_in_range(&mut self, bit_size: usize) -> Witness<F> {
     //     let value: Value<F> = _max_value_in_range(bit_size);
-    //     let value = value.map(|v| v + F::ONE);
+    //     let value = value.map(|v| v + F::one());
     //     self.new_witness_in_range(value, bit_size)
     // }
 
@@ -100,6 +99,8 @@ impl<F: PrimeField + Ord, const MEM_W: usize> Stack<F, MEM_W> {
 }
 
 mod test_composition {
+
+    use halo2::halo2curves::FieldExt;
 
     use crate::{
         gates::{
@@ -127,7 +128,7 @@ mod test_composition {
             let terms: Vec<Scaled<F>> = (0..n_terms)
                 .map(|_| stack.rand_witness_in_range(LIMB_SIZE).into())
                 .collect();
-            let constant = if use_constants { rand() } else { F::ZERO };
+            let constant = if use_constants { rand() } else { F::zero() };
 
             let expected = Scaled::compose(&terms[..], constant);
             let result = &stack.compose(&terms[..], constant);
@@ -141,7 +142,7 @@ mod test_composition {
             // zero sum
 
             let mut terms: Vec<Scaled<F>> = (0..n_terms).map(|_| stack.rand_scaled()).collect();
-            let constant = if use_constants { rand() } else { F::ZERO };
+            let constant = if use_constants { rand() } else { F::zero() };
 
             let result = Scaled::compose(&terms[..], constant);
             let result: Scaled<_> = stack.new_witness(result).into();
@@ -196,8 +197,8 @@ mod test_composition {
                 let sum: Value<F> = Term::compose(&terms[..], constant);
 
                 let w0 = stack.new_witness(sum);
-                let w1 = stack.new_witness(Value::known(F::ONE));
-                let factor = -F::ONE;
+                let w1 = stack.new_witness(Value::known(F::one()));
+                let factor = -F::one();
                 let sum = SecondDegreeScaled::new(&w0, &w1, factor).into();
                 terms.push(sum);
                 stack.zero_sum_second_degree(&terms[..], constant);
@@ -251,7 +252,7 @@ mod test_composition {
         }
     }
 
-    fn run_test_vertical<F: Ord + FromUniformBytes<64>, R: RangeInPlace<F, 1>>() {
+    fn run_test_vertical<F: FieldExt, R: RangeInPlace<F, 1>>() {
         const K: u32 = 17;
         let circuit = TestCircuitVertical::<F, R> {
             _marker: PhantomData::<(F, R)>,
@@ -311,7 +312,7 @@ mod test_composition {
         }
     }
 
-    fn run_test_vanilla<F: Ord + FromUniformBytes<64>>() {
+    fn run_test_vanilla<F: FieldExt>() {
         const K: u32 = 17;
         let circuit = TestCircuitVanilla::<F> {
             _marker: PhantomData::<F>,
@@ -370,7 +371,7 @@ mod test_composition {
         }
     }
 
-    fn run_test_var_vanilla<F: Ord + FromUniformBytes<64>, const W: usize>() {
+    fn run_test_var_vanilla<F: FieldExt, const W: usize>() {
         const K: u32 = 17;
         let circuit = TestCircuitVarVanilla::<F, W> {
             _marker: PhantomData::<F>,
@@ -394,6 +395,8 @@ mod test_composition {
 
 mod test_arithmetic {
 
+    use halo2::halo2curves::FieldExt;
+
     use crate::{
         chip::select::SelectChip,
         gates::{select::SelectGate, vanilla::VanillaGate, var_vanilla::VarVanillaGate},
@@ -405,8 +408,8 @@ mod test_arithmetic {
         let mut stack = Stack::default();
 
         let rand = || F::random(OsRng);
-        let one = &stack.get_constant(F::ONE);
-        let zero = &stack.get_constant(F::ZERO);
+        let one = &stack.get_constant(F::one());
+        let zero = &stack.get_constant(F::zero());
 
         stack.assert_one(one);
         stack.assert_zero(zero);
@@ -502,10 +505,10 @@ mod test_arithmetic {
             stack.assert_bit(one);
             stack.assert_bit(zero);
             // unassigned
-            let w0 = &stack.new_witness(v!(F::ONE));
+            let w0 = &stack.new_witness(v!(F::one()));
             stack.assert_bit(w0);
             stack.assert_one(w0);
-            let w0 = &stack.new_witness(v!(F::ZERO));
+            let w0 = &stack.new_witness(v!(F::zero()));
             stack.assert_bit(w0);
             stack.assert_zero(w0);
         }
@@ -590,7 +593,7 @@ mod test_arithmetic {
         }
     }
 
-    fn run_test_vanilla<F: Ord + FromUniformBytes<64>>() {
+    fn run_test_vanilla<F: FieldExt>() {
         const K: u32 = 17;
         let circuit = TestCircuitVanilla::<F> {
             _marker: PhantomData::<F>,
@@ -648,7 +651,7 @@ mod test_arithmetic {
         }
     }
 
-    fn run_test_var_vanilla<F: Ord + FromUniformBytes<64>, const W: usize>() {
+    fn run_test_var_vanilla<F: FieldExt, const W: usize>() {
         const K: u32 = 17;
         let circuit = TestCircuitVarVanilla::<F, W> {
             _marker: PhantomData::<F>,
@@ -742,7 +745,7 @@ mod test_arithmetic {
         }
     }
 
-    fn run_test_vertical<F: Ord + FromUniformBytes<64>>() {
+    fn run_test_vertical<F: FieldExt>() {
         const K: u32 = 17;
         let circuit = TestCircuitVertical::<F> {
             _marker: PhantomData::<F>,
@@ -762,6 +765,8 @@ mod test_arithmetic {
 }
 
 mod test_rom {
+
+    use halo2::halo2curves::FieldExt;
 
     use crate::{
         chip::ROMChip,
@@ -810,31 +815,31 @@ mod test_rom {
         let f2 = &stack.assign(v!(F::from(2)));
         let f3 = &stack.assign(v!(F::from(3)));
 
-        let _w1 = stack.read(tag, F::ZERO, f1);
+        let _w1 = stack.read(tag, F::zero(), f1);
         w1.iter().zip(_w1.iter()).for_each(|(w, a)| {
             stack.equal(w, a);
         });
-        let _w0 = stack.read(tag, F::ZERO, f0);
+        let _w0 = stack.read(tag, F::zero(), f0);
         w0.iter().zip(_w0.iter()).for_each(|(w, a)| {
             stack.equal(w, a);
         });
-        let _w3 = stack.read(tag, F::ZERO, f3);
+        let _w3 = stack.read(tag, F::zero(), f3);
         w3.iter().zip(_w3.iter()).for_each(|(w, a)| {
             stack.equal(w, a);
         });
-        let _w3 = stack.read(tag, F::ZERO, f3);
+        let _w3 = stack.read(tag, F::zero(), f3);
         w3.iter().zip(_w3.iter()).for_each(|(w, a)| {
             stack.equal(w, a);
         });
-        let _w0 = stack.read(tag, F::ZERO, f0);
+        let _w0 = stack.read(tag, F::zero(), f0);
         w0.iter().zip(_w0.iter()).for_each(|(w, a)| {
             stack.equal(w, a);
         });
-        let _w2 = stack.read(tag, F::ZERO, f2);
+        let _w2 = stack.read(tag, F::zero(), f2);
         w2.iter().zip(_w2.iter()).for_each(|(w, a)| {
             stack.equal(w, a);
         });
-        let _w2 = stack.read(tag, F::ZERO, f2);
+        let _w2 = stack.read(tag, F::zero(), f2);
         w2.iter().zip(_w2.iter()).for_each(|(w, a)| {
             stack.equal(w, a);
         });
@@ -889,7 +894,7 @@ mod test_rom {
         }
     }
 
-    fn run_test_rom<F: Ord + FromUniformBytes<64>>() {
+    fn run_test_rom<F: FieldExt>() {
         const K: u32 = 17;
         let circuit = TestCircuitVertical::<F> {
             _marker: PhantomData::<F>,

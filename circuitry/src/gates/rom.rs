@@ -195,8 +195,8 @@ impl<F: PrimeField + Ord, const W: usize> ROMGate<F, W> {
         ctx.fixed(self.query_tag, tag)?;
 
         // just in case
-        ctx.fixed(self.table_tag, F::ZERO)?;
-        ctx.fixed(self.table_address, F::ZERO)?;
+        ctx.fixed(self.table_tag, F::zero())?;
+        ctx.fixed(self.table_address, F::zero())?;
 
         ctx.enable(self.query_selector)?;
         ctx.next(); // TODO consider not to go next
@@ -239,11 +239,11 @@ mod test {
     use std::collections::BTreeMap;
 
     use super::*;
-    use ff::FromUniformBytes;
+
     use halo2::{
         circuit::{SimpleFloorPlanner, Value},
         dev::MockProver,
-        halo2curves::pasta::Fp,
+        halo2curves::{pasta::Fp, FieldExt},
         plonk::Circuit,
     };
     use rand_core::OsRng;
@@ -307,10 +307,10 @@ mod test {
                         for (value, column) in values.iter().zip(cfg.rom_gate.query.iter()) {
                             let _new_cell = ctx.advice(*column, *value)?;
                         }
-                        ctx.fixed(cfg.rom_gate.table_address, F::ZERO)?;
-                        ctx.fixed(cfg.rom_gate.table_tag, F::ZERO)?;
-                        ctx.fixed(cfg.rom_gate.query_base, F::ZERO)?;
-                        ctx.fixed(cfg.rom_gate.query_tag, F::ZERO)?;
+                        ctx.fixed(cfg.rom_gate.table_address, F::zero())?;
+                        ctx.fixed(cfg.rom_gate.table_tag, F::zero())?;
+                        ctx.fixed(cfg.rom_gate.query_base, F::zero())?;
+                        ctx.fixed(cfg.rom_gate.query_tag, F::zero())?;
                         ctx.next();
                     }
 
@@ -327,8 +327,8 @@ mod test {
                             }
                             ctx.fixed(cfg.rom_gate.table_address, *address)?;
                             ctx.fixed(cfg.rom_gate.table_tag, magic)?;
-                            ctx.fixed(cfg.rom_gate.query_base, F::ZERO)?;
-                            ctx.fixed(cfg.rom_gate.query_tag, F::ZERO)?;
+                            ctx.fixed(cfg.rom_gate.query_base, F::zero())?;
+                            ctx.fixed(cfg.rom_gate.query_tag, F::zero())?;
                             ctx.next();
 
                             Ok(values)
@@ -340,12 +340,12 @@ mod test {
                         for (value, column) in values.iter().zip(cfg.rom_gate.query.iter()) {
                             let _new_cell = ctx.advice(*column, *value)?;
                         }
-                        // ctx.advice(cfg.rom_gate.query_fraction, Value::known(F::ONE))?;
-                        ctx.advice(cfg.rom_gate.query_fraction, Value::known(F::ONE))?;
-                        ctx.fixed(cfg.rom_gate.table_address, F::ZERO)?;
-                        ctx.fixed(cfg.rom_gate.table_tag, F::ZERO)?;
-                        ctx.fixed(cfg.rom_gate.query_base, F::ZERO)?;
-                        ctx.fixed(cfg.rom_gate.query_tag, F::ZERO)?;
+                        // ctx.advice(cfg.rom_gate.query_fraction, Value::known(F::one()))?;
+                        ctx.advice(cfg.rom_gate.query_fraction, Value::known(F::one()))?;
+                        ctx.fixed(cfg.rom_gate.table_address, F::zero())?;
+                        ctx.fixed(cfg.rom_gate.table_tag, F::zero())?;
+                        ctx.fixed(cfg.rom_gate.query_base, F::zero())?;
+                        ctx.fixed(cfg.rom_gate.query_tag, F::zero())?;
                         // ctx.enable(cfg.rom_gate.query_selector)?;
                         ctx.next();
                     }
@@ -358,7 +358,7 @@ mod test {
                     for (value, column) in values.iter().zip(cfg.rom_gate.query.iter()) {
                         let _new_cell = ctx.advice(*column, *value)?;
                     }
-                    ctx.fixed(cfg.rom_gate.query_base, F::ZERO)?;
+                    ctx.fixed(cfg.rom_gate.query_base, F::zero())?;
 
                     ctx.advice(cfg.rom_gate.query_fraction, Value::known(address))?;
                     ctx.fixed(cfg.rom_gate.query_tag, magic)?;
@@ -393,7 +393,7 @@ mod test {
         }
     }
 
-    fn run_test_rom<F: Ord + FromUniformBytes<64>, const W: usize>() {
+    fn run_test_rom<F: FieldExt, const W: usize>() {
         const K: u32 = 17;
         let circuit = TestCircuit::<F, W> {
             _marker: PhantomData::<F>,

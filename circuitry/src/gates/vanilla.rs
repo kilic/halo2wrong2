@@ -76,7 +76,7 @@ impl<F: PrimeField> VanillaGate<F> {
 
     fn disable_next(&self, ctx: &mut RegionCtx<'_, '_, F>) -> Result<(), Error> {
         if let Some(column) = self.s_next {
-            ctx.fixed(column, F::ZERO).map(|_| ())
+            ctx.fixed(column, F::zero()).map(|_| ())
         } else {
             Ok(())
         }
@@ -112,19 +112,19 @@ impl<F: PrimeField> VanillaGate<F> {
     }
 
     fn disable_mul(&self, ctx: &mut RegionCtx<'_, '_, F>) -> Result<(), Error> {
-        self.enable_scaled_mul(ctx, F::ZERO)
+        self.enable_scaled_mul(ctx, F::zero())
     }
 
     fn disable_constant(&self, ctx: &mut RegionCtx<'_, '_, F>) -> Result<(), Error> {
-        self.set_constant(ctx, F::ZERO)
+        self.set_constant(ctx, F::zero())
     }
 
     fn enable_mul(&self, ctx: &mut RegionCtx<'_, '_, F>) -> Result<(), Error> {
-        self.enable_scaled_mul(ctx, F::ONE)
+        self.enable_scaled_mul(ctx, F::one())
     }
 
     fn enable_next(&self, ctx: &mut RegionCtx<'_, '_, F>) -> Result<(), Error> {
-        self.enable_scaled_next(ctx, F::ONE)
+        self.enable_scaled_next(ctx, F::one())
     }
 
     fn no_op(&self, ctx: &mut RegionCtx<'_, '_, F>) -> Result<(), Error> {
@@ -146,8 +146,8 @@ impl<F: PrimeField> VanillaGate<F> {
 
     fn empty_cell(&self, ctx: &mut RegionCtx<'_, '_, F>, idx: usize) -> Result<(), Error> {
         let (fixed, advice) = self.column(idx);
-        ctx.fixed(fixed, F::ZERO)?;
-        ctx.advice(advice, Value::known(F::ZERO))?;
+        ctx.fixed(fixed, F::zero())?;
+        ctx.advice(advice, Value::known(F::zero()))?;
         Ok(())
     }
 
@@ -384,7 +384,7 @@ impl<F: PrimeField> VanillaGate<F> {
         // * first row
         // -c*w1 + w1 - res = tmp
         // tmp = c * w0
-        self.enable_scaled_mul(ctx, -F::ONE)?;
+        self.enable_scaled_mul(ctx, -F::one())?;
         self.enable_next(ctx)?;
         self.disable_constant(ctx)?;
         Self::assign(self, ctx, 0, &Scaled::add(w1))?;
@@ -395,7 +395,7 @@ impl<F: PrimeField> VanillaGate<F> {
         // c * w0 = -tmp
         // find the temp witenss
         let c_w0 = cond.value() * w0.value();
-        let c_w0 = Scaled::tmp(c_w0, -F::ONE);
+        let c_w0 = Scaled::tmp(c_w0, -F::one());
         self.enable_mul(ctx)?;
         self.disable_next(ctx)?;
         self.disable_constant(ctx)?;
@@ -460,11 +460,11 @@ impl<F: PrimeField> VanillaGate<F> {
             if in_last_iter {
                 self.disable_next(ctx)?;
             } else {
-                self.enable_scaled_next(ctx, -F::ONE)?;
+                self.enable_scaled_next(ctx, -F::one())?;
             }
 
             // add constant with the first chunk
-            let constant = if i == 0 { constant } else { F::ZERO };
+            let constant = if i == 0 { constant } else { F::zero() };
             self.set_constant(ctx, constant)?;
 
             // terms
@@ -488,7 +488,7 @@ impl<F: PrimeField> VanillaGate<F> {
             sum = sum + Scaled::compose(chunk, constant);
             #[cfg(feature = "prover-sanity")]
             if in_last_iter {
-                sum.map(|sum| assert_eq!(sum, F::ZERO));
+                sum.map(|sum| assert_eq!(sum, F::zero()));
             }
 
             self.next(ctx)?;
@@ -536,8 +536,8 @@ impl<F: PrimeField> VanillaGate<F> {
                     .first()
                     .unwrap()
                     .value()
-                    .map(|_| F::ZERO),
-                F::ZERO,
+                    .map(|_| F::zero()),
+                F::zero(),
             )
         };
 
@@ -552,16 +552,16 @@ impl<F: PrimeField> VanillaGate<F> {
             // * decide next gate
             if in_last_iter {
                 if !first_degree_terms.is_empty() {
-                    self.enable_scaled_next(ctx, -F::ONE)?;
+                    self.enable_scaled_next(ctx, -F::one())?;
                 } else {
                     self.disable_next(ctx)?;
                 }
             } else {
-                self.enable_scaled_next(ctx, -F::ONE)?;
+                self.enable_scaled_next(ctx, -F::one())?;
             }
 
             // add constant in first iter
-            let constant = if i == 0 { constant } else { F::ZERO };
+            let constant = if i == 0 { constant } else { F::zero() };
             self.set_constant(ctx, constant)?;
 
             // assign second degree term
@@ -580,7 +580,7 @@ impl<F: PrimeField> VanillaGate<F> {
             sum = sum + term.value().map(|term| term + constant);
             #[cfg(feature = "prover-sanity")]
             if in_last_iter && first_degree_terms.is_empty() {
-                sum.map(|sum| assert_eq!(sum, F::ZERO));
+                sum.map(|sum| assert_eq!(sum, F::zero()));
             }
 
             // proceed to the next row
@@ -590,7 +590,7 @@ impl<F: PrimeField> VanillaGate<F> {
         // constraint the rest of the first degree terms
         if !first_degree_terms.is_empty() {
             first_degree_terms.push(Witness::tmp(sum).into());
-            self.zero_sum(ctx, &first_degree_terms, F::ZERO)?;
+            self.zero_sum(ctx, &first_degree_terms, F::zero())?;
         }
         Ok(())
     }

@@ -214,7 +214,7 @@ impl<
             .zip(self.rns.left_shifters.iter())
             .map(|(limb, base)| Scaled::new(limb, *base))
             .collect();
-        let native = stack.compose(&terms[..], N::ZERO);
+        let native = stack.compose(&terms[..], N::zero());
 
         Integer::new(
             &limbs.try_into().unwrap(),
@@ -299,12 +299,12 @@ impl<
             .zip(w1.big())
             .zip(cond.value())
             .map(|((w0, w1), cond)| {
-                if cond == N::ONE {
+                if cond == N::one() {
                     w0
                 } else {
                     #[cfg(feature = "sanity-check")]
                     {
-                        assert_eq!(cond, N::ZERO);
+                        assert_eq!(cond, N::zero());
                     }
                     w1
                 }
@@ -339,7 +339,7 @@ impl<
             .zip(self.rns.left_shifters.iter())
             .map(|(limb, base)| Scaled::new(limb, *base))
             .collect();
-        let native = stack.compose(&terms[..], N::ZERO);
+        let native = stack.compose(&terms[..], N::zero());
 
         // find the big
         let values = limbs.iter().map(|limb| limb.value()).collect::<Vec<_>>();

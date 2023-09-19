@@ -64,7 +64,7 @@ impl<
                 if let Some(carry) = carry {
                     terms.push(carry);
                 }
-                let carry_tmp_0: Witness<N> = stack.compose(&terms[..], N::ZERO).into();
+                let carry_tmp_0: Witness<N> = stack.compose(&terms[..], N::zero()).into();
 
                 let carry_tmp_1 = &stack
                     .decompose_generic(carry_tmp_0.value(), carry_max as usize, SUBLIMB_SIZE)
@@ -78,7 +78,7 @@ impl<
         let w = integer.native().into();
         let qp = quotient * -self.rns.wrong_modulus_in_native_modulus;
         let r = result.native().sub();
-        stack.zero_sum(&[w, qp, r], N::ZERO);
+        stack.zero_sum(&[w, qp, r], N::zero());
 
         result
     }
@@ -128,7 +128,7 @@ impl<
                 if let Some(carry) = carry {
                     terms.push(carry);
                 }
-                let carry_tmp_0: Witness<N> = stack.compose(&terms[..], N::ZERO).into();
+                let carry_tmp_0: Witness<N> = stack.compose(&terms[..], N::zero()).into();
 
                 let carry_tmp_1 = &stack
                     .decompose_generic(carry_tmp_0.value(), carry_max as usize, SUBLIMB_SIZE)
@@ -141,6 +141,6 @@ impl<
 
         let w: Scaled<N> = integer.native().into();
         let qp: Scaled<N> = quotient * -self.rns.wrong_modulus_in_native_modulus;
-        stack.zero_sum(&[w, qp], N::ZERO);
+        stack.zero_sum(&[w, qp], N::zero());
     }
 }

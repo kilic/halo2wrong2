@@ -205,7 +205,7 @@ impl<
                     .iter()
                     .map(|scalar| scalar[round])
                     .collect::<Vec<_>>();
-                let mut base = C::Scalar::ONE;
+                let mut base = C::Scalar::one();
                 let selector = selector
                     .iter()
                     .map(|bit| {
@@ -216,7 +216,7 @@ impl<
                     .collect::<Vec<_>>();
 
                 let address_base = C::Scalar::from((2 * chunk_idx * table_size) as u64);
-                let address_fraction = &stack.compose(&selector[..], C::Scalar::ZERO);
+                let address_fraction = &stack.compose(&selector[..], C::Scalar::zero());
 
                 chain.push(self.read_rom(stack, tag, address_base, address_fraction, table_size));
             }

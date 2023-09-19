@@ -82,7 +82,7 @@ impl<
             .map(|(limb, base)| Scaled::new(limb, *base))
             .collect::<Vec<Scaled<N>>>();
 
-        let native = stack.compose(&terms[..], N::ZERO);
+        let native = stack.compose(&terms[..], N::zero());
 
         Integer::new(
             &limbs.try_into().unwrap(),

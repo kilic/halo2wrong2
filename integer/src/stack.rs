@@ -209,7 +209,7 @@
 // //         {
 // //             let result = Scaled::compose(&terms[..], constant_to_add);
 // //             result.map(|must_be_zero| {
-// //                 debug_assert_eq!(must_be_zero, F::ZERO);
+// //                 debug_assert_eq!(must_be_zero, F::zero());
 // //             });
 // //         }
 

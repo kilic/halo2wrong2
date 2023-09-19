@@ -14,12 +14,12 @@ pub trait SelectChip<F: PrimeField + Ord>: Chip<Selection<F>, F> {
             .zip(w1.value())
             .zip(cond.value())
             .map(|((w0, w1), cond)| {
-                if cond == F::ONE {
+                if cond == F::one() {
                     w0
                 } else {
                     #[cfg(feature = "prover-sanity")]
                     {
-                        assert_eq!(cond, F::ZERO);
+                        assert_eq!(cond, F::zero());
                     }
                     w1
                 }

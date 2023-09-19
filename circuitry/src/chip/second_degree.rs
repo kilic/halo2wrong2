@@ -8,12 +8,12 @@ use super::Chip;
 
 pub trait SecondDegreeChip<F: PrimeField + Ord>: Chip<SecondDegreeComposition<F>, F> {
     fn assert_bit(&mut self, w0: &Witness<F>) {
-        self.zero_sum_second_degree(&[(w0 * w0).into(), w0.sub().into()], F::ZERO);
+        self.zero_sum_second_degree(&[(w0 * w0).into(), w0.sub().into()], F::zero());
     }
 
     fn mul(&mut self, w0: &Witness<F>, w1: &Witness<F>) -> Witness<F> {
         let u = self.new_witness(w0.value() * w1.value());
-        self.zero_sum_second_degree(&[(w0 * w1).into(), u.sub().into()], F::ZERO);
+        self.zero_sum_second_degree(&[(w0 * w1).into(), u.sub().into()], F::zero());
         u
     }
 
@@ -47,7 +47,7 @@ pub trait SecondDegreeChip<F: PrimeField + Ord>: Chip<SecondDegreeComposition<F>
 
         let u = self.new_witness(u);
 
-        self.zero_sum_second_degree(&[(u * w1).into(), w0.sub().into()], F::ZERO);
+        self.zero_sum_second_degree(&[(u * w1).into(), w0.sub().into()], F::zero());
         u
     }
 
@@ -56,8 +56,8 @@ pub trait SecondDegreeChip<F: PrimeField + Ord>: Chip<SecondDegreeComposition<F>
             .value()
             .map(|w| w.invert().expect("inv: must be invertable"));
         let u = self.new_witness(u);
-        let one = self.get_constant(F::ONE);
-        self.zero_sum_second_degree(&[(u * w).into(), one.sub().into()], F::ZERO);
+        let one = self.get_constant(F::one());
+        self.zero_sum_second_degree(&[(u * w).into(), one.sub().into()], F::zero());
         u
     }
 
@@ -66,15 +66,15 @@ pub trait SecondDegreeChip<F: PrimeField + Ord>: Chip<SecondDegreeComposition<F>
             .value()
             .map(|w0| {
                 Option::from(w0.invert())
-                    .map(|inverted| (F::ZERO, inverted))
-                    .unwrap_or_else(|| (F::ONE, F::ONE))
+                    .map(|inverted| (F::zero(), inverted))
+                    .unwrap_or_else(|| (F::one(), F::one()))
             })
             .unzip();
         let sign = self.new_witness(sign);
         let inv = self.new_witness(inv);
         self.assert_bit(&sign);
-        self.zero_sum_second_degree(&[(sign * inv).into(), sign.sub().into()], F::ZERO);
-        self.mul_add_constant_scaled(-F::ONE, w, &inv, F::ONE);
+        self.zero_sum_second_degree(&[(sign * inv).into(), sign.sub().into()], F::zero());
+        self.mul_add_constant_scaled(-F::one(), w, &inv, F::one());
         (inv, sign)
     }
 
@@ -92,7 +92,7 @@ pub trait SecondDegreeChip<F: PrimeField + Ord>: Chip<SecondDegreeComposition<F>
         {
             let result = Term::compose(&terms[..], constant_to_add);
             result.map(|must_be_zero| {
-                debug_assert_eq!(must_be_zero, F::ZERO);
+                debug_assert_eq!(must_be_zero, F::zero());
             });
         }
 

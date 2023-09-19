@@ -39,7 +39,7 @@ impl<
                 (0..i / 2 + 1)
                     .map(|j| {
                         let k = i - j;
-                        let base = *base * (if j == k { N::ONE } else { N::from(2) });
+                        let base = *base * (if j == k { N::one() } else { N::from(2) });
                         SecondDegreeScaled::new(&w0.limbs[j], &w0.limbs[k], base).into()
                     })
                     .chain(
@@ -102,7 +102,7 @@ impl<
                 .cloned()
                 .collect::<Vec<Term<N>>>();
 
-            let carry_tmp_0 = &stack.compose_second_degree(&terms[..], N::ZERO);
+            let carry_tmp_0 = &stack.compose_second_degree(&terms[..], N::zero());
 
             let carry_tmp_1 = &stack
                 .decompose_generic(carry_tmp_0.value(), carry_max as usize, SUBLIMB_SIZE)
@@ -116,7 +116,7 @@ impl<
         let w0w1: Term<N> = (w0.native() * w0.native()).into();
         let qp: Term<N> = (quotient.native() * -self.rns.wrong_modulus_in_native_modulus).into();
         let r = result.native().sub().into();
-        stack.zero_sum_second_degree(&[w0w1, qp, r], N::ZERO);
+        stack.zero_sum_second_degree(&[w0w1, qp, r], N::zero());
 
         result
     }
@@ -145,7 +145,7 @@ impl<
                 (0..i / 2 + 1)
                     .map(|j| {
                         let k = i - j;
-                        let base = *base * (if j == k { N::ONE } else { N::from(2) });
+                        let base = *base * (if j == k { N::one() } else { N::from(2) });
                         SecondDegreeScaled::new(&w0.limbs[j], &w0.limbs[k], base).into()
                     })
                     .chain(
@@ -210,7 +210,7 @@ impl<
                 .cloned()
                 .collect::<Vec<Term<N>>>();
 
-            let carry_tmp_0 = &stack.compose_second_degree(&terms[..], N::ZERO);
+            let carry_tmp_0 = &stack.compose_second_degree(&terms[..], N::zero());
 
             let carry_tmp_1 = &stack
                 .decompose_generic(carry_tmp_0.value(), carry_max as usize, SUBLIMB_SIZE)
@@ -225,7 +225,7 @@ impl<
         let qp: Term<N> = (quotient.native() * -self.rns.wrong_modulus_in_native_modulus).into();
         let r = result.native().sub().into();
         let to_sub = to_add.native().add().into();
-        stack.zero_sum_second_degree(&[w0w1, qp, r, to_sub], N::ZERO);
+        stack.zero_sum_second_degree(&[w0w1, qp, r, to_sub], N::zero());
 
         result
     }
@@ -311,7 +311,7 @@ impl<
                     .cloned()
                     .collect::<Vec<Term<N>>>();
 
-                let carry_tmp_0 = &stack.compose_second_degree(&terms[..], N::ZERO);
+                let carry_tmp_0 = &stack.compose_second_degree(&terms[..], N::zero());
 
                 let carry_tmp_1 = &stack
                     .decompose_generic(carry_tmp_0.value(), carry_max as usize, SUBLIMB_SIZE)
@@ -324,7 +324,7 @@ impl<
         let w0w1: Term<N> = (w0.native() * w1.native()).into();
         let qp: Term<N> = (quotient.native() * -self.rns.wrong_modulus_in_native_modulus).into();
         let r = result.native().sub().into();
-        stack.zero_sum_second_degree(&[w0w1, qp, r], N::ZERO);
+        stack.zero_sum_second_degree(&[w0w1, qp, r], N::zero());
 
         result
     }
@@ -416,7 +416,7 @@ impl<
                 // println!("terms: {:#?}", terms.len());
                 // println!("terms {:#?}", terms);
 
-                let carry_tmp_0 = &stack.compose_second_degree(&terms[..], N::ZERO);
+                let carry_tmp_0 = &stack.compose_second_degree(&terms[..], N::zero());
 
                 let carry_tmp_1 = &stack
                     .decompose_generic(carry_tmp_0.value(), carry_max as usize, SUBLIMB_SIZE)
@@ -430,7 +430,7 @@ impl<
         let qp: Term<N> = (quotient.native() * -self.rns.wrong_modulus_in_native_modulus).into();
         let r = result.native().sub().into();
         let to_add = to_add.native().add().into();
-        stack.zero_sum_second_degree(&[w0w1, qp, r, to_add], N::ZERO);
+        stack.zero_sum_second_degree(&[w0w1, qp, r, to_add], N::zero());
 
         result
     }
@@ -540,7 +540,7 @@ impl<
                     .cloned()
                     .collect::<Vec<Term<N>>>();
 
-                let carry_tmp_0 = &stack.compose_second_degree(&terms[..], N::ZERO);
+                let carry_tmp_0 = &stack.compose_second_degree(&terms[..], N::zero());
 
                 // carry_tmp_0.value().map(|e| {
                 //     println!("CARRY {}, {:?}", carry_max, e);
@@ -563,7 +563,7 @@ impl<
         let to_add: Term<N> = to_add.native().add().into();
         let qp: Term<N> = (quotient.native() * -self.rns.wrong_modulus_in_native_modulus).into();
         let dz: Term<N> = (divisor.native() * result.native()).into();
-        stack.zero_sum_second_degree(&[w0w1, qp, dz, to_add], N::ZERO);
+        stack.zero_sum_second_degree(&[w0w1, qp, dz, to_add], N::zero());
 
         result
     }
@@ -668,7 +668,7 @@ impl<
                     .cloned()
                     .collect::<Vec<Term<N>>>();
 
-                let carry_tmp_0 = &stack.compose_second_degree(&terms[..], N::ZERO);
+                let carry_tmp_0 = &stack.compose_second_degree(&terms[..], N::zero());
 
                 // carry_tmp_0.value().map(|e| {
                 //     println!("CARRY {}, {:?}", carry_max, e);
@@ -690,7 +690,7 @@ impl<
         let w0w1: Term<N> = (w0.native() * w1.native()).into();
         let qp: Term<N> = (quotient.native() * -self.rns.wrong_modulus_in_native_modulus).into();
         let dz: Term<N> = (divisor.native() * result.native()).into();
-        stack.zero_sum_second_degree(&[w0w1, qp, dz], N::ZERO);
+        stack.zero_sum_second_degree(&[w0w1, qp, dz], N::zero());
 
         result
     }
@@ -850,13 +850,13 @@ impl<
     //                 )
     //                 .chain(std::iter::once(result.limbs[i - 1].sub().into()))
     //                 .collect::<Vec<Term<_>>>();
-    //             Term::compose(&terms[..], N::ZERO)
+    //             Term::compose(&terms[..], N::zero())
     //         })
     //         .collect::<Vec<_>>();
 
     //     let shift = self.rns.right_shifters[1];
 
-    //     let mut carry = N::ZERO;
+    //     let mut carry = N::zero();
     //     let carries = intermediate
     //         .iter()
     //         .map(|t| {
@@ -963,13 +963,13 @@ impl<
     //                 )
     //                 .chain(std::iter::once(result.limbs[i - 1].sub().into()))
     //                 .collect::<Vec<Term<_>>>();
-    //             Term::compose(&terms[..], N::ZERO)
+    //             Term::compose(&terms[..], N::zero())
     //         })
     //         .collect::<Vec<_>>();
 
     //     let shift = self.rns.right_shifters[1];
 
-    //     let mut carry = N::ZERO;
+    //     let mut carry = N::zero();
     //     let carries = intermediate
     //         .iter()
     //         .map(|t| {
@@ -1063,13 +1063,13 @@ impl<
     //                 )
     //                 .chain(std::iter::once(w0.limbs[i - 1].sub().into()))
     //                 .collect::<Vec<Term<_>>>();
-    //             Term::compose(&terms[..], N::ZERO)
+    //             Term::compose(&terms[..], N::zero())
     //         })
     //         .collect::<Vec<_>>();
 
     //     let shift = self.rns.right_shifters[1];
 
-    //     let mut carry = N::ZERO;
+    //     let mut carry = N::zero();
     //     let carries = intermediate
     //         .iter()
     //         .map(|t| {
@@ -1120,7 +1120,7 @@ impl<
     //         .collect::<Vec<_>>();
 
     //     let limbs = (0..NUMBER_OF_LIMBS)
-    //         .map(|_| stack.new_witness(Value::known(N::ZERO)))
+    //         .map(|_| stack.new_witness(Value::known(N::zero())))
     //         .collect::<Vec<_>>();
     //     let max_vals = (0..NUMBER_OF_LIMBS)
     //         .map(|_| BigUint::zero())
@@ -1150,7 +1150,7 @@ impl<
     //         .cloned()
     //         .collect::<Vec<Term<N>>>();
 
-    //     let carry_tmp_0 = &stack.compose_second_degree(&terms[..], N::ZERO);
+    //     let carry_tmp_0 = &stack.compose_second_degree(&terms[..], N::zero());
 
     //     let carry_tmp_1 = &stack
     //         .decompose_generic(carry_tmp_0.value(), carry_max as usize, SUBLIMB_SIZE)
@@ -1228,7 +1228,7 @@ impl<
     //         .cloned()
     //         .collect::<Vec<Term<N>>>();
 
-    //     let carry_tmp_0 = &stack.compose_second_degree(&terms[..], N::ZERO);
+    //     let carry_tmp_0 = &stack.compose_second_degree(&terms[..], N::zero());
 
     //     let carry_tmp_1 = &stack
     //         .decompose_generic(carry_tmp_0.value(), carry_max as usize, SUBLIMB_SIZE)
@@ -1242,7 +1242,7 @@ impl<
     // let w0w1: Term<N> = (w0.native() * w1.native()).into();
     // let qp: Term<N> = (quotient.native() * -self.rns.wrong_modulus_in_native_modulus).into();
     // let r = result.native().sub().into();
-    // stack.zero_sum_second_degree(&[w0w1, qp, r], N::ZERO);
+    // stack.zero_sum_second_degree(&[w0w1, qp, r], N::zero());
 
     // result
 
@@ -1326,7 +1326,7 @@ impl<
     //             .cloned()
     //             .collect::<Vec<Scaled<N>>>();
 
-    //         let carry_tmp_0 = &stack.compose(&terms[..], N::ZERO);
+    //         let carry_tmp_0 = &stack.compose(&terms[..], N::zero());
 
     //         let carry_tmp_1 = &stack
     //             .decompose_generic(carry_tmp_0.value(), carry_max as usize, SUBLIMB_SIZE)
@@ -1340,7 +1340,7 @@ impl<
     //     let w0w1: Scaled<N> = w0.native().scale(constant.native);
     //     let qp: Scaled<N> = quotient.native() * -self.rns.wrong_modulus_in_native_modulus;
     //     let r = result.native().sub();
-    //     stack.zero_sum(&[w0w1, qp, r], N::ZERO);
+    //     stack.zero_sum(&[w0w1, qp, r], N::zero());
 
     //     result
     // }
@@ -1368,7 +1368,7 @@ impl<
     //             (0..i / 2 + 1)
     //                 .map(|j| {
     //                     let k = i - j;
-    //                     let base = *base * (if j == k { N::ONE } else { N::from(2) });
+    //                     let base = *base * (if j == k { N::one() } else { N::from(2) });
     //                     SecondDegreeScaled::new(&w0.limbs[j], &w0.limbs[k], base).into()
     //                 })
     //                 .chain(
@@ -1432,7 +1432,7 @@ impl<
     //             .cloned()
     //             .collect::<Vec<Term<N>>>();
 
-    //         let carry_tmp_0 = &stack.compose_second_degree(&terms[..], N::ZERO);
+    //         let carry_tmp_0 = &stack.compose_second_degree(&terms[..], N::zero());
 
     //         let carry_tmp_1 = &stack
     //             .decompose_generic(carry_tmp_0.value(), carry_max as usize, SUBLIMB_SIZE)
@@ -1446,7 +1446,7 @@ impl<
     //     let w0w1: Term<N> = (w0.native() * w0.native()).into();
     //     let qp: Term<N> = (quotient.native() * -self.rns.wrong_modulus_in_native_modulus).into();
     //     let r = result.native().sub().into();
-    //     stack.zero_sum_second_degree(&[w0w1, qp, r], N::ZERO);
+    //     stack.zero_sum_second_degree(&[w0w1, qp, r], N::zero());
 
     //     result
     // }
@@ -1533,7 +1533,7 @@ impl<
     //             .cloned()
     //             .collect::<Vec<Term<N>>>();
 
-    //         let carry_tmp_0 = &stack.compose_second_degree(&terms[..], N::ZERO);
+    //         let carry_tmp_0 = &stack.compose_second_degree(&terms[..], N::zero());
 
     //         let carry_tmp_1 = &stack
     //             .decompose_generic(carry_tmp_0.value(), carry_max as usize, SUBLIMB_SIZE)
@@ -1547,7 +1547,7 @@ impl<
     //     let w0w1: Term<N> = (result.native() * w1.native()).into();
     //     let qp: Term<N> = (quotient.native() * -self.rns.wrong_modulus_in_native_modulus).into();
     //     let r = w0.native().sub().into();
-    //     stack.zero_sum_second_degree(&[w0w1, qp, r], N::ZERO);
+    //     stack.zero_sum_second_degree(&[w0w1, qp, r], N::zero());
 
     //     result
     // }

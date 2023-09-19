@@ -4,7 +4,7 @@ use num_traits::{One, Zero};
 use std::ops::Shl;
 
 pub fn modulus<F: PrimeField>() -> BigUint {
-    fe_to_big(&-F::ONE) + 1usize
+    fe_to_big(&-F::one()) + 1usize
 }
 
 pub fn power_of_two<F: PrimeField>(n: usize) -> F {
@@ -72,7 +72,7 @@ pub fn compose_into<
 ) -> W {
     let shifter = BigUint::one() << LIMB_SIZE;
     let shifter: W = big_to_fe_unsafe(&shifter);
-    input.iter().rev().fold(W::ZERO, |acc, val| {
+    input.iter().rev().fold(W::zero(), |acc, val| {
         (acc * shifter) + fe_to_fe_unsafe::<W, N>(val)
     })
 }
@@ -138,28 +138,28 @@ fn get_bits_128(segment: usize, window: usize, bytes: &[u8]) -> u128 {
     (u128::from_le_bytes(v) << (skip_bits - (skip_bytes * 8))) & ((1 << window) - 1)
 }
 
-pub fn decompose_127_into<
-    W: PrimeField,
-    N: PrimeField,
-    const NUMBER_OF_LIMBS: usize,
-    const LIMB_SIZE: usize,
->(
-    e: &W,
-) -> [N; NUMBER_OF_LIMBS] {
-    #[cfg(feature = "sanity-checks")]
-    {
-        assert!(LIMB_SIZE <= 127);
-    }
-    let repr = e.to_repr();
-    (0..NUMBER_OF_LIMBS)
-        .map(|i| {
-            let u = get_bits_128(i, LIMB_SIZE, repr.as_ref());
-            N::from_u128(u)
-        })
-        .collect::<Vec<_>>()
-        .try_into()
-        .unwrap()
-}
+// pub fn decompose_127_into<
+//     W: PrimeField,
+//     N: PrimeField,
+//     const NUMBER_OF_LIMBS: usize,
+//     const LIMB_SIZE: usize,
+// >(
+//     e: &W,
+// ) -> [N; NUMBER_OF_LIMBS] {
+//     #[cfg(feature = "sanity-checks")]
+//     {
+//         assert!(LIMB_SIZE <= 127);
+//     }
+//     let repr = e.to_repr();
+//     (0..NUMBER_OF_LIMBS)
+//         .map(|i| {
+//             let u = get_bits_128(i, LIMB_SIZE, repr.as_ref());
+//             N::from_u128(u)
+//         })
+//         .collect::<Vec<_>>()
+//         .try_into()
+//         .unwrap()
+// }
 
 fn get_bits_64(segment: usize, window: usize, bytes: &[u8]) -> u64 {
     let skip_bits = segment * window;
@@ -197,7 +197,7 @@ mod test {
     use ff::PrimeField;
     use rand_core::OsRng;
 
-    use crate::utils::{compose, compose_into, decompose_127_into, decompose_dyn};
+    use crate::utils::{compose, compose_into, decompose_dyn};
 
     use super::{decompose, decompose_into, decompose_into_dyn, fe_to_big};
 
@@ -213,10 +213,10 @@ mod test {
             let u0 = decompose_into_dyn::<W, N>(&e0, NUMBER_OF_LIMBS, LIMB_SIZE);
             let u1 = decompose_into::<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>(&e0);
             assert_eq!(u0, u1);
-            let u2 = decompose_127_into::<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>(&e0);
-            assert_eq!(u0, u2);
-            let e1: W = compose_into::<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>(&u2);
-            assert_eq!(e0, e1);
+            // let u2 = decompose_127_into::<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>(&e0);
+            // assert_eq!(u0, u2);
+            // let e1: W = compose_into::<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>(&u2);
+            // assert_eq!(e0, e1);
 
             let e0 = W::random(OsRng);
             let e0 = fe_to_big(&e0);

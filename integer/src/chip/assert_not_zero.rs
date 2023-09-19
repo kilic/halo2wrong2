@@ -41,7 +41,7 @@ impl<
             .zip(self.rns.left_shifters.iter())
             .map(|(limb, base)| Scaled::new(limb, *base))
             .collect::<Vec<Scaled<N>>>();
-        let native = &stack.compose(&terms[..], N::ZERO);
+        let native = &stack.compose(&terms[..], N::zero());
 
         // r = 0 <-> r % 2 ^ 64 = 0 /\ r % native_modulus = 0
         // r <> 0 <-> r % 2 ^ 64 <> 0 \/ r % native_modulus <> 0

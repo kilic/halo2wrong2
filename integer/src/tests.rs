@@ -10,10 +10,11 @@ use circuitry::{
     utils::{big_to_fe, modulus},
     LayoutCtx,
 };
-use ff::{FromUniformBytes, PrimeField};
+use ff::PrimeField;
 use halo2::{
     circuit::{Layouter, SimpleFloorPlanner, Value},
     dev::MockProver,
+    halo2curves::FieldExt,
     plonk::{Circuit, ConstraintSystem, Error},
 };
 use num_bigint::{BigUint, RandBigInt};
@@ -439,7 +440,7 @@ impl<
 
 fn run_test<
     W: PrimeField,
-    N: Ord + FromUniformBytes<64>,
+    N: FieldExt,
     R: RangeInPlace<N, 1>,
     const NUMBER_OF_LIMBS: usize,
     const LIMB_SIZE: usize,

@@ -85,7 +85,7 @@ impl<F: PrimeField> Composable<F> for Term<F> {
         match self {
             Self::First(e) => e.value(),
             Self::Second(e) => e.value(),
-            Self::Zero => Value::known(F::ZERO),
+            Self::Zero => Value::known(F::zero()),
         }
     }
 }
@@ -120,7 +120,7 @@ impl<F: PrimeField> Witness<F> {
     }
 
     pub fn dummy() -> Self {
-        Self::tmp(Value::known(F::ZERO))
+        Self::tmp(Value::known(F::zero()))
     }
 
     pub fn mul(&self) -> Scaled<F> {
@@ -167,24 +167,24 @@ impl<F: PrimeField> Scaled<F> {
     pub fn dummy() -> Self {
         Scaled {
             witness: Witness::dummy(),
-            factor: F::ZERO,
+            factor: F::zero(),
         }
     }
 
     pub(crate) fn is_empty(&self) -> bool {
-        self.factor == F::ZERO
+        self.factor == F::zero()
     }
 
     pub fn mul(witness: &Witness<F>) -> Self {
-        Self::new(witness, F::ZERO)
+        Self::new(witness, F::zero())
     }
 
     pub fn add(witness: &Witness<F>) -> Self {
-        Self::new(witness, F::ONE)
+        Self::new(witness, F::one())
     }
 
     pub fn sub(witness: &Witness<F>) -> Self {
-        Self::new(witness, -F::ONE)
+        Self::new(witness, -F::one())
     }
 
     pub fn result(witness: &Witness<F>) -> Self {
@@ -202,7 +202,7 @@ impl<F: PrimeField> Scaled<F> {
 
 impl<F: PrimeField> SecondDegreeScaled<F> {
     pub(crate) fn is_empty(&self) -> bool {
-        self.factor == F::ZERO
+        self.factor == F::zero()
     }
     pub fn new(w0: &Witness<F>, w1: &Witness<F>, factor: F) -> Self {
         Self {
@@ -239,7 +239,7 @@ impl<F: PrimeField> From<Witness<F>> for Scaled<F> {
     fn from(e: Witness<F>) -> Self {
         Self {
             witness: e,
-            factor: F::ONE,
+            factor: F::one(),
         }
     }
 }
@@ -248,7 +248,7 @@ impl<F: PrimeField> From<&Witness<F>> for Scaled<F> {
     fn from(e: &Witness<F>) -> Self {
         Self {
             witness: *e,
-            factor: F::ONE,
+            factor: F::one(),
         }
     }
 }
@@ -257,7 +257,7 @@ impl<F: PrimeField> From<Witness<F>> for Term<F> {
     fn from(e: Witness<F>) -> Self {
         Scaled {
             witness: e,
-            factor: F::ONE,
+            factor: F::one(),
         }
         .into()
     }
@@ -267,7 +267,7 @@ impl<F: PrimeField> From<&Witness<F>> for Term<F> {
     fn from(e: &Witness<F>) -> Self {
         Scaled {
             witness: *e,
-            factor: F::ONE,
+            factor: F::one(),
         }
         .into()
     }
@@ -300,28 +300,28 @@ impl<F: PrimeField> From<&SecondDegreeScaled<F>> for Term<F> {
 impl<F: PrimeField> std::ops::Mul for Witness<F> {
     type Output = SecondDegreeScaled<F>;
     fn mul(self, rhs: Self) -> Self::Output {
-        SecondDegreeScaled::new(&self, &rhs, F::ONE)
+        SecondDegreeScaled::new(&self, &rhs, F::one())
     }
 }
 
 impl<F: PrimeField> std::ops::Mul<&Witness<F>> for Witness<F> {
     type Output = SecondDegreeScaled<F>;
     fn mul(self, rhs: &Self) -> Self::Output {
-        SecondDegreeScaled::new(&self, rhs, F::ONE)
+        SecondDegreeScaled::new(&self, rhs, F::one())
     }
 }
 
 impl<F: PrimeField> std::ops::Mul for &Witness<F> {
     type Output = SecondDegreeScaled<F>;
     fn mul(self, rhs: &Witness<F>) -> Self::Output {
-        SecondDegreeScaled::new(self, rhs, F::ONE)
+        SecondDegreeScaled::new(self, rhs, F::one())
     }
 }
 
 impl<F: PrimeField> std::ops::Mul<Witness<F>> for &Witness<F> {
     type Output = SecondDegreeScaled<F>;
     fn mul(self, rhs: Witness<F>) -> Self::Output {
-        SecondDegreeScaled::new(self, &rhs, F::ONE)
+        SecondDegreeScaled::new(self, &rhs, F::one())
     }
 }
 

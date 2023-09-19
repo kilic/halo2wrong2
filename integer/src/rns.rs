@@ -47,7 +47,7 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const LIMB_SIZE
 {
     fn calculate_base_aux() -> [BigUint; NUMBER_OF_LIMBS] {
         let two = N::from(2);
-        let r = &fe_to_big(&two.pow([LIMB_SIZE as u64, 0, 0, 0]));
+        let r = &fe_to_big(&two.pow_vartime([LIMB_SIZE as u64, 0, 0, 0]));
         let wrong_modulus = modulus::<W>();
         let wrong_modulus_limbs_big = decompose::<NUMBER_OF_LIMBS, LIMB_SIZE>(&wrong_modulus);
         let wrong_modulus_limbs: [N; NUMBER_OF_LIMBS] = wrong_modulus_limbs_big
@@ -200,7 +200,7 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const LIMB_SIZE
         let two = N::from(2);
         // Left shifts field element by `u * LIMB_SIZE` bits
         let left_shifters: [N; NUMBER_OF_LIMBS] = (0..NUMBER_OF_LIMBS)
-            .map(|i| two.pow([(i * LIMB_SIZE) as u64, 0, 0, 0]))
+            .map(|i| two.pow_vartime([(i * LIMB_SIZE) as u64, 0, 0, 0]))
             .collect::<Vec<N>>()
             .try_into()
             .unwrap();

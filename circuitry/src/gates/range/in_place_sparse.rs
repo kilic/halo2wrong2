@@ -44,7 +44,7 @@ impl<F: PrimeField, const W: usize, const BIT_SIZE: usize> RangeInPlace<F, W>
         _idx: usize,
         _bit_size: usize,
     ) -> Result<(), Error> {
-        ctx.fixed(self.scale, F::ONE)?;
+        ctx.fixed(self.scale, F::one())?;
         Ok(())
     }
 
@@ -86,7 +86,7 @@ impl<F: PrimeField, const W: usize, const BIT_SIZE: usize> RangeInPlace<F, W>
         for (rem_size, witnesses) in remainings.iter() {
             let u = BIT_SIZE.checked_sub(*rem_size).unwrap();
             assert!(u > 0);
-            let factor = (F::ONE + F::ONE).pow(&[u as u64]);
+            let factor = (F::one() + F::one()).pow_vartime(&[u as u64]);
 
             for witnesses in witnesses.chunks(W) {
                 ctx.fixed(self.scale, factor)?;

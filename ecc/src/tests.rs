@@ -9,13 +9,13 @@ use circuitry::gates::var_vanilla::VarVanillaGate;
 use circuitry::gates::vertical::VerticalGate;
 use circuitry::stack::Stack;
 use ff::Field;
-use ff::FromUniformBytes;
 use ff::PrimeField;
 use group::{Curve, Group};
 
 use halo2::halo2curves::bn256::{Bn256, Fr, G1Affine, G1};
 use halo2::halo2curves::pasta::Fp;
 use halo2::halo2curves::CurveExt;
+use halo2::halo2curves::FieldExt;
 use halo2::plonk::{create_proof, keygen_pk, keygen_vk, Advice, Column};
 use halo2::poly::commitment::ParamsProver;
 use halo2::poly::kzg::commitment::{KZGCommitmentScheme, ParamsKZG};
@@ -304,7 +304,7 @@ fn run_test<
     number_of_points: usize,
     window: usize,
 ) where
-    C::Scalar: FromUniformBytes<64>,
+    C::Scalar: FieldExt,
 {
     // let aux_generator = Value::known(C::CurveExt::random(OsRng).into());
     let aux_generator = Value::known(C::CurveExt::generator().into());
@@ -416,12 +416,11 @@ fn test_prover() {
 fn write_srs(k: u32) -> ParamsKZG<Bn256> {
     let path = format!("srs_{k}.bin");
     let params = ParamsKZG::<Bn256>::new(k);
-    params
-        .write_custom(
-            &mut std::fs::File::create(path).unwrap(),
-            halo2::SerdeFormat::RawBytesUnchecked,
-        )
-        .unwrap();
+    params.write_custom(
+        &mut std::fs::File::create(path).unwrap(),
+        halo2::SerdeFormat::RawBytesUnchecked,
+    );
+
     params
 }
 
@@ -431,7 +430,6 @@ fn read_srs(k: u32) -> ParamsKZG<Bn256> {
     match file {
         Ok(mut file) => {
             ParamsKZG::<Bn256>::read_custom(&mut file, halo2::SerdeFormat::RawBytesUnchecked)
-                .unwrap()
         }
         Err(_) => write_srs(k),
     }
