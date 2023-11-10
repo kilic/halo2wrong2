@@ -155,7 +155,7 @@ pub trait FirstDegreeChip<F: PrimeField + Ord>: Chip<FirstDegreeComposition<F>, 
 
         #[cfg(feature = "prover-sanity")]
         {
-            let result = Scaled::compose(&terms[..], constant_to_add);
+            let result = Scaled::sum(&terms[..], constant_to_add);
             result.map(|must_be_zero| {
                 assert_eq!(must_be_zero, F::ZERO);
             });
@@ -169,7 +169,7 @@ pub trait FirstDegreeChip<F: PrimeField + Ord>: Chip<FirstDegreeComposition<F>, 
         // TODO: don't allow empty terms
         let mut terms: Vec<Scaled<F>> = terms.iter().filter(|e| !e.is_empty()).cloned().collect();
         assert!(!terms.is_empty());
-        let result = Scaled::compose(&terms[..], constant_to_add);
+        let result = Scaled::sum(&terms[..], constant_to_add);
         let result = self.new_witness(result).sub();
         terms.push(result);
         let composition = FirstDegreeComposition::new_no_range(terms, constant_to_add);

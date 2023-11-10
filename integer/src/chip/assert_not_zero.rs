@@ -36,7 +36,7 @@ impl<
         }
 
         let terms: Vec<Scaled<N>> = w0
-            .limbs
+            .limbs()
             .iter()
             .zip(self.rns.left_shifters.iter())
             .map(|(limb, base)| Scaled::new(limb, *base))
@@ -46,7 +46,7 @@ impl<
         // r = 0 <-> r % 2 ^ 64 = 0 /\ r % native_modulus = 0
         // r <> 0 <-> r % 2 ^ 64 <> 0 \/ r % native_modulus <> 0
         // r <> 0 <-> invert(r.limb(0)) \/ invert(r.native())
-        let cond_zero_0 = stack.is_zero(&w0.limbs[0]);
+        let cond_zero_0 = stack.is_zero(&w0.limbs()[0]);
         let cond_zero_1 = stack.is_zero(native);
         // one of them might be succeeded, i.e. cond_zero_0 * cond_zero_1 = 0
         let must_be_zero = stack.mul(&cond_zero_0, &cond_zero_1);
@@ -56,8 +56,8 @@ impl<
         // native_modulus = wrong_modulus % native_modulus r <> p <->
         // invert(r.limb(0) - wrong_modulus[0]) \/ invert(r.native() -
         // wrong_modulus.native())
-        let limb_dif = stack.add_constant(&w0.limbs[0], -self.rns.wrong_modulus_limbs[0]);
-        let native_dif = stack.add_constant(native, -self.rns.wrong_modulus_in_native_modulus);
+        let limb_dif = stack.add_constant(&w0.limbs()[0], -self.rns.wrong_limbs[0]);
+        let native_dif = stack.add_constant(native, -self.rns.wrong_in_native);
         let cond_wrong_0 = stack.is_zero(&limb_dif);
         let cond_wrong_1 = stack.is_zero(&native_dif);
         let must_be_zero = stack.mul(&cond_wrong_0, &cond_wrong_1);

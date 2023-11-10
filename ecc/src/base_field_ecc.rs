@@ -162,9 +162,9 @@ impl<
         stack: &mut Stack,
         point: &Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>,
     ) {
-        let y_square = &self.ch.square(stack, point.y());
-        let x_square = &self.ch.square(stack, point.x());
-        let x_cube = &self.ch.mul(stack, point.x(), x_square);
+        let y_square = &self.ch.square(stack, point.y(), &[]);
+        let x_square = &self.ch.square(stack, point.x(), &[]);
+        let x_cube = &self.ch.mul(stack, point.x(), x_square, &[]);
         let x_cube_b = &self.ch.add_constant(stack, x_cube, &self.b);
         self.ch.normal_equal(stack, x_cube_b, y_square);
     }
@@ -296,16 +296,16 @@ impl<
         // lambda = b_y - a_y / b_x - a_x
         let numer = &self.ch.sub(stack, &b.y, &a.y);
         let denom = &self.ch.sub(stack, &b.x, &a.x);
-        let lambda = &self.ch.div_incomplete(stack, numer, denom);
+        let lambda = &self.ch.div(stack, numer, denom);
         // c_x =  lambda * lambda - a_x - b_x
         let t = &self.ch.add(stack, &a.x, &b.x);
         let t = &self.ch.neg(stack, t);
-        let x = &self.ch.square_add(stack, lambda, t);
+        let x = &self.ch.square(stack, lambda, &[&t]);
 
         // c_y = lambda * (a_x - c_x) - a_y
         let t = &self.ch.sub(stack, &a.x, x);
         let y_neg = &self.ch.neg(stack, &a.y);
-        let y = &self.ch.mul_add(stack, t, lambda, y_neg);
+        let y = &self.ch.mul(stack, t, lambda, &[&y_neg]);
         Point::new(x, y)
     }
 
@@ -319,16 +319,16 @@ impl<
         // lambda = b_y + a_y / a_x - b_x
         let numer = &self.ch.add(stack, &b.y, &a.y);
         let denom = &self.ch.sub(stack, &a.x, &b.x);
-        let lambda = &self.ch.div_incomplete(stack, numer, denom);
+        let lambda = &self.ch.div(stack, numer, denom);
         // c_x =  lambda * lambda - a_x - b_x
         let t = &self.ch.add(stack, &a.x, &b.x);
         let t = &self.ch.neg(stack, t);
-        let x = &self.ch.square_add(stack, lambda, t);
+        let x = &self.ch.square(stack, lambda, &[&t]);
 
         // c_y = lambda * (a_x - c_x) - a_y
         let t = &self.ch.sub(stack, &a.x, x);
         let y_neg = &self.ch.neg(stack, &a.y);
-        let y = &self.ch.mul_add(stack, t, lambda, y_neg);
+        let y = &self.ch.mul(stack, t, lambda, &[&y_neg]);
 
         Point::new(x, y)
     }
@@ -340,18 +340,18 @@ impl<
         point: &Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>,
     ) -> Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE> {
         // lambda = (3 * a_x^2) / 2 * a_y
-        let x_0_square = &self.ch.square(stack, &point.x);
+        let x_0_square = &self.ch.square(stack, &point.x, &[]);
         let numer = &self.ch.mul3(stack, x_0_square);
         let denom = &self.ch.mul2(stack, &point.y);
-        let lambda = &self.ch.div_incomplete(stack, numer, denom);
+        let lambda = &self.ch.div(stack, numer, denom);
         // c_x = lambda * lambda - 2 * a_x
         let xx = &self.ch.mul2(stack, &point.x);
         let xx_neg = &self.ch.neg(stack, xx);
-        let x = &self.ch.square_add(stack, lambda, xx_neg);
+        let x = &self.ch.square(stack, lambda, &[&xx_neg]);
         // c_y = lambda * (a_x - c_x) - a_y
         let t = &self.ch.sub(stack, &point.x, x);
         let y_neg = &self.ch.neg(stack, &point.y);
-        let y = &self.ch.mul_add(stack, lambda, t, y_neg);
+        let y = &self.ch.mul(stack, lambda, t, &[&y_neg]);
 
         // let denom = &self.ch.mul2(stack, &point.y);
         // let lambda = &self
@@ -363,11 +363,11 @@ impl<
         // // c_x = lambda * lambda - 2 * a_x
         // let xx = &self.ch.mul2(stack, &point.x);
         // let xx_neg = &self.ch.neg(stack, xx);
-        // let x = &self.ch.square_add(stack, lambda, xx_neg);
+        // let x = &self.ch.square(stack, lambda, &[xx_neg]);
         // // c_y = lambda * (a_x - c_x) - a_y
         // let t = &self.ch.sub(stack, &point.x, x);
         // let y_neg = &self.ch.neg(stack, &point.y);
-        // let y = &self.ch.mul_add(stack, lambda, t, &y_neg);
+        // let y = &self.ch.mul(stack, lambda, t, &&[&y_neg]);
 
         Point::new(x, y)
     }
@@ -402,10 +402,10 @@ impl<
 
         let t0 = &self.ch.sub(stack, &p1.y, &p0.y);
         let t1 = &self.ch.sub(stack, &p1.x, &p0.x);
-        let lambda = self.ch.div_incomplete(stack, t0, t1);
+        let lambda = self.ch.div(stack, t0, t1);
         let t = &self.ch.add(stack, &p0.x, &p1.x);
         let t = &self.ch.neg(stack, t);
-        let x_cur = self.ch.square_add(stack, &lambda, t);
+        let x_cur = self.ch.square(stack, &lambda, &[&t]);
         let mut state = State {
             x_prev: p0.x.clone(),
             y_prev: p0.y.clone(),
@@ -419,10 +419,10 @@ impl<
             let to_add = self.ch.add(stack, &state.y_prev, &point.y);
             let lambda = self
                 .ch
-                .neg_mul_add_div(stack, &state.lambda, t, denom, &to_add);
+                .neg_mul_div(stack, &state.lambda, t, denom, &[&to_add]);
             let t = &self.ch.add(stack, &state.x_cur, &point.x);
             let t = &self.ch.neg(stack, t);
-            state.x_cur = self.ch.square_add(stack, &lambda, t);
+            state.x_cur = self.ch.square(stack, &lambda, &[&t]);
             state.lambda = lambda;
             state.x_prev = point.x.clone();
             state.y_prev = point.y.clone();
@@ -430,7 +430,7 @@ impl<
 
         let t = &self.ch.sub(stack, &state.x_prev, &state.x_cur);
         let neg_y_prev = &self.ch.neg(stack, &state.y_prev);
-        let y_cur = self.ch.mul_add(stack, &state.lambda, t, neg_y_prev);
+        let y_cur = self.ch.mul(stack, &state.lambda, t, &[&neg_y_prev]);
         Point::new(&state.x_cur, &y_cur)
     }
 
@@ -447,7 +447,7 @@ impl<
     //     // lambda_0 = (y_2 - y_1) / (x_2 - x_1)
     //     let numer = &self.ch.sub(stack, &to_add.y, &to_double.y);
     //     let denom = &self.ch.sub(stack, &to_add.x, &to_double.x);
-    //     let lambda_0 = &self.ch.div_incomplete(stack, numer, denom);
+    //     let lambda_0 = &self.ch.div(stack, numer, denom);
     //     // x_3 = lambda_0 * lambda_0 - x_1 - x_2
     //     let lambda_0_square = &self.ch.square(stack, lambda_0);
     //     let t = &self.ch.add(stack, &to_add.x, &to_double.x);
@@ -455,7 +455,7 @@ impl<
     //     // lambda_1 = lambda_0 + 2 * y_1 / (x_3 - x_1)
     //     let numer = &self.ch.mul2(stack, &to_double.y);
     //     let denom = &self.ch.sub(stack, x_3, &to_double.x);
-    //     let lambda_1 = &self.ch.div_incomplete(stack, numer, denom);
+    //     let lambda_1 = &self.ch.div(stack, numer, denom);
     //     let lambda_1 = &self.ch.add(stack, lambda_0, lambda_1);
     //     // x_4 = lambda_1 * lambda_1 - x_1 - x_3
     //     let lambda_1_square = &self.ch.square(stack, lambda_1);

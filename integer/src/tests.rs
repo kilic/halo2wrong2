@@ -30,20 +30,15 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const LIMB_SIZE
     Rns<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>
 {
     pub fn modulus(&self) -> UnassignedInteger<W, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
-        UnassignedInteger::from(Value::known(modulus::<W>()))
+        UnassignedInteger::from_big(Value::known(modulus::<W>()))
     }
-
-    // pub fn from_str(&self, e: &str) -> UnassignedInteger<W, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
-    //     let a: W = big_to_fe(&BigUint::from_str_radix(e, 16).unwrap());
-    //     UnassignedInteger::from_fe(a)
-    // }
 
     pub fn from_fe(&self, e: W) -> UnassignedInteger<W, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
         UnassignedInteger::from_fe(Value::known(e))
     }
 
     pub fn from_big(&self, e: BigUint) -> UnassignedInteger<W, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
-        UnassignedInteger::from(Value::known(e))
+        UnassignedInteger::from_big(Value::known(e))
     }
 
     pub fn rand_in_field(&self) -> UnassignedInteger<W, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
@@ -51,15 +46,15 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const LIMB_SIZE
     }
 
     pub fn rand_in_remainder_range(&self) -> UnassignedInteger<W, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
-        UnassignedInteger::from(Value::known(OsRng.gen_biguint(self.max_remainder.bits())))
+        UnassignedInteger::from_big(Value::known(OsRng.gen_biguint(self.max_remainder.bits())))
     }
 
     pub fn rand_in_operand_range(&self) -> UnassignedInteger<W, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
-        UnassignedInteger::from(Value::known(OsRng.gen_biguint(self.max_operand.bits())))
+        UnassignedInteger::from_big(Value::known(OsRng.gen_biguint(self.max_operand.bits())))
     }
 
     pub fn rand_in_unreduced_range(&self) -> UnassignedInteger<W, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
-        self.rand_with_limb_bit_size(self.max_unreduced_limb.bits() as usize)
+        self.rand_with_limb_bit_size(self._max_unreduced_limb.bits() as usize)
     }
 
     pub fn rand_with_limb_bit_size(
@@ -80,11 +75,11 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const LIMB_SIZE
     }
 
     pub fn zero(&self) -> UnassignedInteger<W, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
-        UnassignedInteger::from(Value::known(BigUint::zero()))
+        UnassignedInteger::from_big(Value::known(BigUint::zero()))
     }
 
     pub fn one(&self) -> UnassignedInteger<W, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
-        UnassignedInteger::from(Value::known(BigUint::one()))
+        UnassignedInteger::from_big(Value::known(BigUint::one()))
     }
 }
 
@@ -218,7 +213,7 @@ fn make_stack<
         let res = a0.value().zip(a1.value()).map(|(a0, a1)| a0 * a1);
         let u0 = UnassignedInteger::from_fe(res);
         let u0 = ch.range(stack, u0, Range::Remainder);
-        let u1 = ch.mul(stack, a0, a1);
+        let u1 = ch.mul(stack, a0, a1, &[]);
         ch.copy_equal(stack, &u0, &u1);
         ch.normal_equal(stack, &u0, &u1);
         u1.value()
@@ -241,7 +236,8 @@ fn make_stack<
         let u0 = UnassignedInteger::from_fe(res);
         let u0 = ch.range(stack, u0, Range::Remainder);
         let to_sub = ch.neg(stack, &to_sub);
-        let u1 = ch.mul_add(stack, a0, a1, &to_sub);
+
+        let u1 = ch.mul(stack, a0, a1, &[&to_sub]);
         ch.copy_equal(stack, &u0, &u1);
         ch.normal_equal(stack, &u0, &u1);
         u1.value()
@@ -256,7 +252,8 @@ fn make_stack<
         let res = a0.value().map(|a0| (a0 * a0));
         let u0 = UnassignedInteger::from_fe(res);
         let u0 = ch.range(stack, u0, Range::Remainder);
-        let u1 = ch.square(stack, a0);
+        let u1 = ch.square(stack, a0, &[]);
+
         ch.copy_equal(stack, &u0, &u1);
         ch.normal_equal(stack, &u0, &u1);
         u1.value()
@@ -275,7 +272,7 @@ fn make_stack<
         let u0 = UnassignedInteger::from_fe(res);
         let u0 = ch.range(stack, u0, Range::Remainder);
         let to_sub = ch.neg(stack, &to_sub);
-        let u1 = ch.square_add(stack, a0, &to_sub);
+        let u1 = ch.square(stack, a0, &[&to_sub]);
         ch.copy_equal(stack, &u0, &u1);
         ch.normal_equal(stack, &u0, &u1);
         u1.value()
@@ -299,7 +296,7 @@ fn make_stack<
                 .map(|(a0, a1)| a0 * a1.invert().unwrap());
             let u0 = UnassignedInteger::from_fe(res);
             let u0 = ch.range(stack, u0, Range::Remainder);
-            let u1 = ch.div_incomplete(stack, a0, a1);
+            let u1 = ch.div(stack, a0, a1);
             ch.copy_equal(stack, &u0, &u1);
             ch.normal_equal(stack, &u0, &u1);
         }
@@ -314,7 +311,7 @@ fn make_stack<
 
         let divisor = &ch.range(stack, divisor, Range::Operand);
         let to_add = ch.range(stack, to_add, Range::Remainder);
-        let u1 = ch.neg_mul_add_div(stack, a0, a1, divisor, &to_add);
+        let u1 = ch.neg_mul_div(stack, a0, a1, divisor, &[&to_add]);
 
         let res = a0
             .value()

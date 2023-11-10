@@ -2,6 +2,7 @@ use crate::integer::Integer;
 use ff::PrimeField;
 use halo2::circuit::Value;
 use num_bigint::BigUint;
+use num_traits::Zero;
 
 use crate::{
     integer::{Range, UnassignedInteger},
@@ -33,22 +34,6 @@ impl<
     ) -> bool {
         a.max() > self.rns.max_remainder
     }
-
-    pub(crate) fn reduce_if_gt_max_operand<Stack: SecondDegreeChip<N> + FirstDegreeChip<N>>(
-        &self,
-        stack: &mut Stack,
-
-        a: &Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-    ) -> Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
-        // TODO: consider disallowing under the hood redcution
-        if self.is_gt_max_operand(a) {
-            // here to signal mostly unexpected behavior
-            println!("GT MAX OPERAND!");
-            self.reduce(stack, a)
-        } else {
-            a.clone()
-        }
-    }
 }
 
 use std::collections::BTreeMap;
@@ -58,47 +43,9 @@ use circuitry::{
         first_degree::FirstDegreeChip, second_degree::SecondDegreeChip, select::SelectChip, Core,
         ROMChip,
     },
-    utils::{big_to_fe_unsafe, compose, compose_into, fe_to_big},
+    utils::{big_to_fe, big_to_fe_unsafe, compose, compose_into, decompose, fe_to_big, modulus},
     witness::{Composable, Scaled, Witness},
 };
-
-// pub trait CRT256Chip<F: PrimeField + Ord, const NUMBER_OF_LIMBS: usize>:
-//     Chip<CRT256Enforcement<F, NUMBER_OF_LIMBS>, F>
-// {
-//     fn big_mul(
-//         &mut self,
-//         w0: &[Witness<F>; NUMBER_OF_LIMBS],
-//         w1: &[Witness<F>; NUMBER_OF_LIMBS],
-//         result: &[Witness<F>; NUMBER_OF_LIMBS],
-//         quotient: &[Witness<F>; NUMBER_OF_LIMBS],
-//         carries: &[Witness<F>; NUMBER_OF_LIMBS],
-//         to_sub: &[Witness<F>; NUMBER_OF_LIMBS],
-//     ) {
-//         self.new_op(CRT256Enforcement::Mul {
-//             w0: w0.clone(),
-//             w1: w1.clone(),
-//             result: result.clone(),
-//             quotient: quotient.clone(),
-//             carries: carries.clone(),
-//             to_sub: to_sub.clone(),
-//         })
-//     }
-
-//     fn big_red(
-//         &mut self,
-//         w0: &[Witness<F>; NUMBER_OF_LIMBS],
-//         result: &[Witness<F>; NUMBER_OF_LIMBS],
-//         carries: &[Witness<F>; NUMBER_OF_LIMBS],
-//         quotient: &Witness<F>,
-//     ) {
-//         self.new_op(CRT256Enforcement::Reduce {
-//             w0: w0.clone(),
-//             result: result.clone(),
-//             carries: carries.clone(),
-//             quotient: *quotient,
-//         })
-//     }
-// }
 
 #[derive(Debug)]
 pub struct IntegerChip<
@@ -110,8 +57,87 @@ pub struct IntegerChip<
     const SUBLIMB_SIZE: usize,
 > {
     pub(crate) rns: Rns<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
+    pub(super) base_sub_aux: [BigUint; NUMBER_OF_LIMBS],
     pub(super) subtraction_aux:
         BTreeMap<usize, ([N; NUMBER_OF_LIMBS], [BigUint; NUMBER_OF_LIMBS], N)>,
+}
+
+fn calculate_base_sub_aux<
+    W: PrimeField,
+    N: PrimeField,
+    const NUMBER_OF_LIMBS: usize,
+    const LIMB_SIZE: usize,
+>(
+    rns: &Rns<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
+) -> [BigUint; NUMBER_OF_LIMBS] {
+    let two = N::from(2);
+    let r = &fe_to_big(&two.pow([LIMB_SIZE as u64, 0, 0, 0]));
+    let wrong_modulus = modulus::<W>();
+    let wrong_limbs_big = decompose::<NUMBER_OF_LIMBS, LIMB_SIZE>(&wrong_modulus);
+    let wrong_limbs: [N; NUMBER_OF_LIMBS] = wrong_limbs_big
+        .iter()
+        .map(|limb| big_to_fe_unsafe(limb))
+        .collect::<Vec<N>>()
+        .try_into()
+        .unwrap();
+
+    // `base_aux = 2 * wrong_modulus`
+    let mut aux: Vec<BigUint> = wrong_limbs
+        .iter()
+        .map(|limb| fe_to_big(limb) << 1usize)
+        .collect();
+
+    // If value of a limb is not above dense limb borrow from the next one
+    for i in 0..NUMBER_OF_LIMBS - 1 {
+        let hidx = NUMBER_OF_LIMBS - i - 1;
+        let lidx = hidx - 1;
+
+        if (aux[lidx].bits() as usize) < (LIMB_SIZE + 1) {
+            aux[hidx] = aux[hidx].clone() - 1usize;
+            aux[lidx] = aux[lidx].clone() + r;
+        }
+    }
+
+    let aux: [BigUint; NUMBER_OF_LIMBS] = aux.try_into().unwrap();
+
+    {
+        let base_aux_value = compose::<NUMBER_OF_LIMBS, LIMB_SIZE>(&aux);
+        // Must be equal to wrong modulus
+        assert!(base_aux_value.clone() % &rns.wrong_modulus == BigUint::zero());
+        // Expected to be above next power of two
+        assert!(base_aux_value > rns.max_remainder);
+        // Assert limbs are above max values
+        for (aux_limb, rem_limb) in aux.iter().zip(rns.max_remainder_limbs.iter()) {
+            assert!(aux_limb >= &rem_limb);
+        }
+    }
+
+    aux
+}
+
+fn shift_sub_aux<
+    W: PrimeField,
+    N: PrimeField,
+    const NUMBER_OF_LIMBS: usize,
+    const LIMB_SIZE: usize,
+>(
+    base_sub_aux: &[BigUint; NUMBER_OF_LIMBS],
+    shift: usize,
+) -> ([N; NUMBER_OF_LIMBS], [BigUint; NUMBER_OF_LIMBS], N) {
+    let aux_big: [BigUint; NUMBER_OF_LIMBS] = base_sub_aux
+        .iter()
+        .map(|aux_limb| aux_limb << shift)
+        .collect::<Vec<_>>()
+        .try_into()
+        .unwrap();
+    let aux = aux_big
+        .iter()
+        .map(|e| big_to_fe(e))
+        .collect::<Vec<N>>()
+        .try_into()
+        .unwrap();
+    let native = compose_into::<N, N, NUMBER_OF_LIMBS, LIMB_SIZE>(&aux);
+    (aux, aux_big, native)
 }
 
 impl<
@@ -127,55 +153,13 @@ impl<
         &self.rns
     }
 
-    pub fn new(rns: &Rns<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>) -> Self {
-        let subtraction_aux = (0..50)
-            .map(|shift| (shift, Self::calculate_sub_aux(rns, shift)))
-            .collect::<BTreeMap<_, _>>();
-        Self {
-            rns: rns.clone(),
-
-            subtraction_aux,
-        }
-    }
-
-    fn calculate_sub_aux(
-        rns: &Rns<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-        shift: usize,
-    ) -> ([N; NUMBER_OF_LIMBS], [BigUint; NUMBER_OF_LIMBS], N) {
-        let aux_big: [BigUint; NUMBER_OF_LIMBS] = rns
-            .base_aux
-            .iter()
-            .map(|aux_limb| aux_limb << shift)
-            .collect::<Vec<_>>()
-            .try_into()
-            .unwrap();
-        let aux = aux_big
-            .iter()
-            .map(|e| big_to_fe_unsafe(e))
-            .collect::<Vec<N>>()
-            .try_into()
-            .unwrap();
-        let native = compose_into::<N, N, NUMBER_OF_LIMBS, LIMB_SIZE>(&aux);
-        (aux, aux_big, native)
-    }
-}
-
-impl<
-        W: PrimeField,
-        N: PrimeField + Ord,
-        const NUMBER_OF_LIMBS: usize,
-        const LIMB_SIZE: usize,
-        const NUMBER_OF_SUBLIMBS: usize,
-        const SUBLIMB_SIZE: usize,
-    > IntegerChip<W, N, NUMBER_OF_LIMBS, LIMB_SIZE, NUMBER_OF_SUBLIMBS, SUBLIMB_SIZE>
-{
-    pub(crate) fn subtracion_aux(
+    pub(crate) fn get_sub_aux(
         &self,
         max_vals: &[BigUint; NUMBER_OF_LIMBS],
     ) -> ([N; NUMBER_OF_LIMBS], [BigUint; NUMBER_OF_LIMBS], N) {
         let mut max_shift = 0usize;
 
-        for (max_val, aux) in max_vals.iter().zip(self.rns.base_aux.iter()) {
+        for (max_val, aux) in max_vals.iter().zip(self.base_sub_aux.iter()) {
             let mut shift = 1;
             let mut aux = aux.clone();
             while *max_val > aux {
@@ -189,11 +173,39 @@ impl<
             Some(aux) => aux.clone(),
             None => {
                 println!("requied to calculate new sub aux at {max_shift}");
-                Self::calculate_sub_aux(&self.rns, max_shift)
+                shift_sub_aux::<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>(&self.base_sub_aux, max_shift)
             }
         }
     }
 
+    pub fn new(rns: &Rns<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>) -> Self {
+        let base_sub_aux = calculate_base_sub_aux::<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>(rns);
+        let subtraction_aux = (0..50)
+            .map(|shift| {
+                (
+                    shift,
+                    shift_sub_aux::<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>(&base_sub_aux, shift),
+                )
+            })
+            .collect::<BTreeMap<_, _>>();
+
+        Self {
+            rns: rns.clone(),
+            base_sub_aux,
+            subtraction_aux,
+        }
+    }
+}
+
+impl<
+        W: PrimeField,
+        N: PrimeField + Ord,
+        const NUMBER_OF_LIMBS: usize,
+        const LIMB_SIZE: usize,
+        const NUMBER_OF_SUBLIMBS: usize,
+        const SUBLIMB_SIZE: usize,
+    > IntegerChip<W, N, NUMBER_OF_LIMBS, LIMB_SIZE, NUMBER_OF_SUBLIMBS, SUBLIMB_SIZE>
+{
     pub fn assign(
         &self,
         stack: &mut impl FirstDegreeChip<N>,
@@ -202,7 +214,6 @@ impl<
     ) -> Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
         let limbs: Vec<Witness<N>> = integer
             .limbs()
-            .transpose_vec(NUMBER_OF_LIMBS)
             .iter()
             .map(|limb| stack.new_witness(*limb))
             .collect();
@@ -235,18 +246,6 @@ impl<
         });
     }
 
-    // pub fn to_bits(
-    //     &self,
-    //     stack: CRTChip<N,NUMBER_OF_LIMBS>,
-    //     integer: &Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-    // ) -> Vec<Witness<N>> {
-    //     let decomposed: Vec<Witness<N>> = (0..NUMBER_OF_LIMBS)
-    //         .flat_map(|idx| stack.decompose::<LIMB_SIZE, 1>(&integer.limbs[idx]))
-    //         .collect();
-    //     assert_eq!(decomposed.len(), self.rns.wrong_modulus.bits() as usize);
-    //     decomposed
-    // }
-
     pub fn normal_equal<Stack: SecondDegreeChip<N> + FirstDegreeChip<N>>(
         &self,
         stack: &mut Stack,
@@ -277,18 +276,18 @@ impl<
         let limbs = w0
             .limbs()
             .iter()
-            .zip(w1.limbs.iter())
+            .zip(w1.limbs().iter())
             .map(|(w0, w1)| stack.select(cond, w0, w1))
             .collect::<Vec<_>>()
             .try_into()
             .unwrap();
 
-        let native = stack.select(cond, &w0.native, &w1.native);
+        let native = stack.select(cond, w0.native(), w1.native());
 
         let max_vals = w0
-            .max_vals
+            .max_vals()
             .iter()
-            .zip(w1.max_vals.iter())
+            .zip(w1.max_vals().iter())
             .map(|(w0, w1)| std::cmp::max(w0, w1).clone())
             .collect::<Vec<_>>()
             .try_into()
@@ -302,7 +301,7 @@ impl<
                 if cond == N::ONE {
                     w0
                 } else {
-                    #[cfg(feature = "sanity-check")]
+                    #[cfg(feature = "prover-sanity")]
                     {
                         assert_eq!(cond, N::ZERO);
                     }
@@ -321,7 +320,7 @@ impl<
         integer: &Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
     ) {
         assert!(!self.is_gt_max_remainder(integer));
-        stack.write(tag, address, &integer.limbs);
+        stack.write(tag, address, integer.limbs());
     }
 
     pub fn read_recover<Stack: FirstDegreeChip<N> + ROMChip<N, NUMBER_OF_LIMBS>>(
@@ -354,15 +353,4 @@ impl<
 
         Integer::new(&limbs, &max_values, big, native)
     }
-
-    // pub fn assert_bit(
-    //     &self,
-    //     stack: &mut impl ArithmeticChip<N>,
-    //     w0: &Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-    // ) {
-    //     for limb in w0.limbs().iter().skip(1) {
-    //         stack.assert_zero(limb);
-    //     }
-    //     stack.assert_bit(w0.limbs().first().unwrap())
-    // }
 }

@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 
-use ark_std::{end_timer, start_timer};
-
+use ark_std::end_timer;
+use ark_std::start_timer;
 use circuitry::gates::range::in_place::RangeInPlaceGate;
 use circuitry::gates::range::RangeInPlace;
 use circuitry::gates::rom::ROMGate;
@@ -73,61 +73,59 @@ fn make_stack<
     }
 
     // constant registry
-    // {
-    //     let p = C::CurveExt::random(OsRng);
-    //     let p_val = Value::known(p.into());
-    //     let p_assigned = ch.assign_point(stack, p_val);
-    //     let p_constant = ch.register_constant(stack, p.into());
-    //     ch.assert_on_curve(stack, &p_constant);
-    //     ch.copy_equal(stack, &p_assigned, &p_constant);
-    //     ch.normal_equal(stack, &p_assigned, &p_constant);
-    // }
+    {
+        let p = C::CurveExt::random(OsRng);
+        let p_val = Value::known(p.into());
+        let p_assigned = ch.assign_point(stack, p_val);
+        let p_constant = ch.register_constant(stack, p.into());
+        ch.assert_on_curve(stack, &p_constant);
+        ch.copy_equal(stack, &p_assigned, &p_constant);
+        ch.normal_equal(stack, &p_assigned, &p_constant);
+    }
 
-    // // add
-    // {
-    //     let a: Value<C> = value(C::CurveExt::random(OsRng).into());
-    //     let b: Value<C> = value(C::CurveExt::random(OsRng).into());
-    //     let c: Value<C> = (a + b).map(|p| p.to_affine());
-    //     let a = ch.assign_point(stack, a);
-    //     let b = ch.assign_point(stack, b);
-    //     let c0 = ch.assign_point(stack, c);
-    //     let c1 = ch.add_incomplete(stack, &a, &b);
-    //     ch.normal_equal(stack, &c0, &c1);
+    // add
+    {
+        let a: Value<C> = value(C::CurveExt::random(OsRng).into());
+        let b: Value<C> = value(C::CurveExt::random(OsRng).into());
+        let c: Value<C> = (a + b).map(|p| p.to_affine());
+        let a = ch.assign_point(stack, a);
+        let b = ch.assign_point(stack, b);
+        let c0 = ch.assign_point(stack, c);
+        let c1 = ch.add_incomplete(stack, &a, &b);
+        ch.normal_equal(stack, &c0, &c1);
 
-    //     let a: Value<C> = value(C::CurveExt::random(OsRng).into());
-    //     let b: Value<C> = value(C::CurveExt::random(OsRng).into());
-    //     let c: Value<C> = (a - b).map(|p| p.to_affine());
-    //     let a = ch.assign_point(stack, a);
-    //     let b = ch.assign_point(stack, b);
-    //     let c0 = ch.assign_point(stack, c);
-    //     let c1 = ch.sub_incomplete(stack, &a, &b);
-    //     ch.normal_equal(stack, &c0, &c1);
+        let a: Value<C> = value(C::CurveExt::random(OsRng).into());
+        let b: Value<C> = value(C::CurveExt::random(OsRng).into());
+        let c: Value<C> = (a - b).map(|p| p.to_affine());
+        let a = ch.assign_point(stack, a);
+        let b = ch.assign_point(stack, b);
+        let c0 = ch.assign_point(stack, c);
+        let c1 = ch.sub_incomplete(stack, &a, &b);
+        ch.normal_equal(stack, &c0, &c1);
 
-    //     let n = 10;
-    //     let points: Vec<C::CurveExt> = (0..n).map(|_| C::CurveExt::random(OsRng)).collect();
-    //     let sum = points
-    //         .iter()
-    //         .fold(C::CurveExt::identity(), |acc, p| acc + p);
-    //     let u0 = ch.assign_point(stack, value(sum.into()));
-    //     let points = points
-    //         .into_iter()
-    //         .map(|p| ch.assign_point(stack, value(p.to_affine())))
-    //         .collect::<Vec<_>>();
-    //     let u1 = ch.add_multi(stack, &points[..]);
-    //     println!("u0 {:?}", u0.value::<C>());
-    //     println!("u1 {:?}", u1.value::<C>());
-    //     ch.normal_equal(stack, &u0, &u1);
-    // }
+        let n = 10;
+        let points: Vec<C::CurveExt> = (0..n).map(|_| C::CurveExt::random(OsRng)).collect();
+        let sum = points
+            .iter()
+            .fold(C::CurveExt::identity(), |acc, p| acc + p);
+        let u0 = ch.assign_point(stack, value(sum.into()));
+        let points = points
+            .into_iter()
+            .map(|p| ch.assign_point(stack, value(p.to_affine())))
+            .collect::<Vec<_>>();
+        let u1 = ch.add_multi(stack, &points[..]);
+        ch.normal_equal(stack, &u0, &u1);
+    }
 
-    // // double
-    // {
-    //     let a: Value<C> = value(C::CurveExt::random(OsRng).into());
-    //     let c = (a + a).map(|p| p.to_affine());
-    //     let a = ch.assign_point(stack, a);
-    //     let c0 = ch.assign_point(stack, c);
-    //     let c1 = ch.double_incomplete(stack, &a);
-    //     ch.normal_equal(stack, &c0, &c1);
-    // }
+    // double
+    {
+        let a: Value<C> = value(C::CurveExt::random(OsRng).into());
+        let c = (a + a).map(|p| p.to_affine());
+        let a = ch.assign_point(stack, a);
+        let c0 = ch.assign_point(stack, c);
+        let c1 = ch.double_incomplete(stack, &a);
+        ch.normal_equal(stack, &c0, &c1);
+    }
 
     let tag0 = C::Scalar::random(OsRng);
     // let tag1 = C::Scalar::random(OsRng);
@@ -392,7 +390,8 @@ fn run_test_prover<
 }
 
 #[test]
-fn test_prover() {
+#[ignore]
+fn bench_prover() {
     let aux_generator = Value::known(G1::random(OsRng).into());
 
     let circuit = TestCircuit::<G1Affine, RangeInPlaceGate<Fr, 1>, 3, 90, 5, 18> {

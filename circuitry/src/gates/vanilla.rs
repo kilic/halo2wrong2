@@ -485,7 +485,7 @@ impl<F: PrimeField> VanillaGate<F> {
             Self::assign(self, ctx, 2, &t)?;
 
             // update running sum
-            sum = sum + Scaled::compose(chunk, constant);
+            sum = sum + Scaled::sum(chunk, constant);
             #[cfg(feature = "prover-sanity")]
             if in_last_iter {
                 sum.map(|sum| assert_eq!(sum, F::ZERO));

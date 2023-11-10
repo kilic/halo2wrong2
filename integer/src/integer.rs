@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 
 use circuitry::{
     utils::{big_to_fe, big_to_fe_unsafe, compose, decompose, decompose_into, fe_to_big},
-    witness::Witness,
+    witness::{Composable, Witness},
 };
 use ff::PrimeField;
 use halo2::circuit::Value;
@@ -12,9 +12,8 @@ use num_bigint::BigUint;
 pub enum Range {
     Remainder,
     Operand,
-    MulQuotient,
-    #[cfg(test)]
     Unreduced,
+    MulQuotient,
 }
 
 pub struct UnassignedInteger<
@@ -23,15 +22,15 @@ pub struct UnassignedInteger<
     const NUMBER_OF_LIMBS: usize,
     const LIMB_SIZE: usize,
 > {
-    pub(crate) limbs: Value<[N; NUMBER_OF_LIMBS]>,
-    pub(crate) big: Value<BigUint>,
+    limbs: [Value<N>; NUMBER_OF_LIMBS],
+    big: Value<BigUint>,
     _marker: PhantomData<W>,
 }
 
 impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const LIMB_SIZE: usize>
-    From<Value<BigUint>> for UnassignedInteger<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>
+    UnassignedInteger<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>
 {
-    fn from(big: Value<BigUint>) -> Self {
+    pub fn from_big(big: Value<BigUint>) -> Self {
         let limbs = big.clone().map(|big| {
             decompose::<NUMBER_OF_LIMBS, LIMB_SIZE>(&big)
                 .iter()
@@ -41,23 +40,19 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const LIMB_SIZE
                 .unwrap()
         });
         Self {
-            limbs,
+            limbs: limbs.transpose_array(),
             big,
             _marker: PhantomData,
         }
     }
-}
 
-impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const LIMB_SIZE: usize>
-    UnassignedInteger<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>
-{
     pub fn from_limbs(limbs: Value<[N; NUMBER_OF_LIMBS]>) -> Self {
         let big = limbs.map(|limbs| {
             let limbs = limbs.iter().map(fe_to_big).collect::<Vec<_>>();
             compose::<NUMBER_OF_LIMBS, LIMB_SIZE>(&limbs.try_into().unwrap())
         });
         Self {
-            limbs,
+            limbs: limbs.transpose_array(),
             big,
             _marker: PhantomData,
         }
@@ -68,8 +63,9 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const LIMB_SIZE
         Self::from_limbs(limbs)
     }
 
-    pub fn limbs(&self) -> &Value<[N; NUMBER_OF_LIMBS]> {
+    pub fn limbs(&self) -> &[Value<N>; NUMBER_OF_LIMBS] {
         &self.limbs
+        // self.limbs.transpose_vec(NUMBER_OF_LIMBS)
     }
 
     pub(crate) fn big(&self) -> Value<BigUint> {
@@ -77,7 +73,7 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const LIMB_SIZE
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Integer<
     W: PrimeField,
     N: PrimeField,
@@ -85,10 +81,45 @@ pub struct Integer<
     const LIMB_SIZE: usize,
 > {
     pub(crate) limbs: [Witness<N>; NUMBER_OF_LIMBS],
-    pub(crate) max_vals: [BigUint; NUMBER_OF_LIMBS],
-    pub(crate) big: Value<BigUint>,
-    pub(crate) native: Witness<N>,
+    max_vals: [BigUint; NUMBER_OF_LIMBS],
+    big: Value<BigUint>,
+    native: Witness<N>,
     _marker: PhantomData<W>,
+}
+
+impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const LIMB_SIZE: usize>
+    std::fmt::Debug for Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut debug = f.debug_struct("Integer");
+
+        self.big.as_ref().map(|big| {
+            debug.field(
+                "value:  ",
+                &format!("{}, 0x{}", big.bits(), big.to_str_radix(16)),
+            );
+        });
+        debug.field(
+            "max:    ",
+            &format!("{}, 0x{}", self.max().bits(), self.max().to_str_radix(16)),
+        );
+
+        self.limbs
+            .iter()
+            .zip(self.max_vals.iter())
+            .enumerate()
+            .for_each(|(_, (limb, max))| {
+                limb.value().map(|limb| {
+                    let value = fe_to_big(&limb);
+
+                    debug.field(
+                        "limb:   ",
+                        &format!("{}, 0x{}", max.bits(), &value.to_str_radix(16)),
+                    );
+                });
+            });
+        debug.finish()
+    }
 }
 
 impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const LIMB_SIZE: usize>
@@ -100,11 +131,11 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const LIMB_SIZE
         big: Value<BigUint>,
         native: Witness<N>,
     ) -> Self {
-        #[cfg(feature = "sanity-check")]
+        #[cfg(feature = "prover-sanity")]
         {
             let limbs = limbs.iter().map(|limb| limb.value());
             let limbs: Value<Vec<_>> = Value::from_iter(limbs);
-            let expect = UnassignedInteger::<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>::new(
+            let expect = UnassignedInteger::<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>::from_limbs(
                 limbs.map(|limbs| limbs.try_into().unwrap()),
             )
             .big();
@@ -132,52 +163,24 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const LIMB_SIZE
         &self.limbs[idx]
     }
 
-    pub fn native(&self) -> Witness<N> {
-        self.native
+    pub fn native(&self) -> &Witness<N> {
+        &self.native
     }
 
     pub fn big(&self) -> Value<BigUint> {
         self.big.clone()
     }
 
+    pub fn max_vals(&self) -> &[BigUint; NUMBER_OF_LIMBS] {
+        &self.max_vals
+    }
+
     pub fn max(&self) -> BigUint {
-        // TODO: consider caching
         compose::<NUMBER_OF_LIMBS, LIMB_SIZE>(&self.max_vals)
     }
 
     pub fn value(&self) -> Value<W> {
-        // TODO: 'utils::compose' can be faster
         self.big.clone().map(|a| big_to_fe(&a))
-    }
-}
-
-impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const LIMB_SIZE: usize>
-    From<BigUint> for ConstantInteger<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>
-{
-    fn from(big: BigUint) -> Self {
-        let native: N = big_to_fe(&big);
-        let limbs_big = decompose::<NUMBER_OF_LIMBS, LIMB_SIZE>(&big);
-        let limbs: [N; NUMBER_OF_LIMBS] = limbs_big
-            .iter()
-            .map(|e| big_to_fe_unsafe(e))
-            .collect::<Vec<_>>()
-            .try_into()
-            .unwrap();
-
-        #[cfg(feature = "sanity-check")]
-        {
-            use circuitry::utils::compose_into;
-            let expect = compose_into::<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>(&limbs);
-            assert_eq!(expect, *e);
-        }
-
-        Self {
-            big,
-            limbs,
-            limbs_big,
-            native,
-            _marker: PhantomData,
-        }
     }
 }
 
@@ -188,34 +191,53 @@ pub struct ConstantInteger<
     const NUMBER_OF_LIMBS: usize,
     const LIMB_SIZE: usize,
 > {
-    pub(crate) limbs: [N; NUMBER_OF_LIMBS],
-    pub(crate) limbs_big: [BigUint; NUMBER_OF_LIMBS],
-    pub(crate) native: N,
-    pub(crate) big: BigUint,
+    limbs: [N; NUMBER_OF_LIMBS],
+    big_limbs: [BigUint; NUMBER_OF_LIMBS],
+    native: N,
+    big: BigUint,
     _marker: PhantomData<W>,
 }
 impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const LIMB_SIZE: usize>
     ConstantInteger<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>
 {
+    pub fn from_big(big: BigUint) -> Self {
+        let native: N = big_to_fe(&big);
+        let big_limbs = decompose::<NUMBER_OF_LIMBS, LIMB_SIZE>(&big);
+        let limbs: [N; NUMBER_OF_LIMBS] = big_limbs
+            .iter()
+            .map(|e| big_to_fe_unsafe(e))
+            .collect::<Vec<_>>()
+            .try_into()
+            .unwrap();
+
+        Self {
+            big,
+            limbs,
+            big_limbs,
+            native,
+            _marker: PhantomData,
+        }
+    }
+
     pub fn from_fe(e: &W) -> Self {
         let big = fe_to_big(e);
-        big.into()
+        Self::from_big(big)
     }
 
-    pub(crate) fn big(&self) -> BigUint {
-        self.big.clone()
+    pub fn big(&self) -> &BigUint {
+        &self.big
     }
 
-    pub(crate) fn native(&self) -> N {
+    pub fn native(&self) -> N {
         self.native
     }
 
-    pub(crate) fn limbs(&self) -> &[N; NUMBER_OF_LIMBS] {
+    pub fn limbs(&self) -> &[N; NUMBER_OF_LIMBS] {
         &self.limbs
     }
 
-    pub(crate) fn limbs_big(&self) -> &[BigUint; NUMBER_OF_LIMBS] {
-        &self.limbs_big
+    pub fn big_limbs(&self) -> &[BigUint; NUMBER_OF_LIMBS] {
+        &self.big_limbs
     }
 
     pub fn value(&self) -> W {

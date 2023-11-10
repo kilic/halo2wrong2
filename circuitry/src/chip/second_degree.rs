@@ -90,7 +90,7 @@ pub trait SecondDegreeChip<F: PrimeField + Ord>: Chip<SecondDegreeComposition<F>
 
         #[cfg(feature = "prover-sanity")]
         {
-            let result = Term::compose(&terms[..], constant_to_add);
+            let result = Term::sum(&terms[..], constant_to_add);
             result.map(|must_be_zero| {
                 debug_assert_eq!(must_be_zero, F::ZERO);
             });
@@ -103,7 +103,7 @@ pub trait SecondDegreeChip<F: PrimeField + Ord>: Chip<SecondDegreeComposition<F>
     fn compose_second_degree(&mut self, terms: &[Term<F>], constant_to_add: F) -> Witness<F> {
         let mut terms: Vec<Term<F>> = terms.iter().filter(|e| !e.is_empty()).cloned().collect();
         assert!(!terms.is_empty());
-        let result = Term::compose(&terms[..], constant_to_add);
+        let result = Term::sum(&terms[..], constant_to_add);
         let result = self.new_witness(result).sub();
         terms.push(result.into());
         let composition = SecondDegreeComposition::new(terms, constant_to_add);

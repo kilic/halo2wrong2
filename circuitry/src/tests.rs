@@ -129,7 +129,7 @@ mod test_composition {
                 .collect();
             let constant = if use_constants { rand() } else { F::ZERO };
 
-            let expected = Scaled::compose(&terms[..], constant);
+            let expected = Scaled::sum(&terms[..], constant);
             let result = &stack.compose(&terms[..], constant);
             result
                 .value()
@@ -143,7 +143,7 @@ mod test_composition {
             let mut terms: Vec<Scaled<F>> = (0..n_terms).map(|_| stack.rand_scaled()).collect();
             let constant = if use_constants { rand() } else { F::ZERO };
 
-            let result = Scaled::compose(&terms[..], constant);
+            let result = Scaled::sum(&terms[..], constant);
             let result: Scaled<_> = stack.new_witness(result).into();
             terms.push(result.neg());
             stack.zero_sum(&terms[..], constant);
@@ -170,7 +170,7 @@ mod test_composition {
                         .cloned()
                         .collect();
                     let constant = rand();
-                    let expect = Term::compose(&terms[..], constant);
+                    let expect = Term::sum(&terms[..], constant);
                     let expect = &stack.assign(expect);
                     let result = stack.compose_second_degree(&terms[..], constant);
                     result
@@ -193,7 +193,7 @@ mod test_composition {
                     .cloned()
                     .collect();
                 let constant = rand();
-                let sum: Value<F> = Term::compose(&terms[..], constant);
+                let sum: Value<F> = Term::sum(&terms[..], constant);
 
                 let w0 = stack.new_witness(sum);
                 let w1 = stack.new_witness(Value::known(F::ONE));

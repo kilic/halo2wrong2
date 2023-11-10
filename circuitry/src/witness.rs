@@ -6,13 +6,19 @@ use ff::PrimeField;
 use crate::utils::{decompose_into, decompose_into_dyn, fe_to_big};
 
 pub trait Composable<F: PrimeField>: Sized {
+    type Scaled: Composable<F>;
+
     fn value(&self) -> Value<F>;
 
-    fn compose(terms: &[Self], constant: F) -> Value<F> {
+    fn scale(&self, factor: F) -> Self::Scaled;
+
+    fn sum(terms: &[Self], constant: F) -> Value<F> {
         terms.iter().fold(Value::known(constant), |acc, term| {
             acc.zip(term.value()).map(|(acc, coeff)| acc + coeff)
         })
     }
+
+    fn as_term(&self) -> Term<F>;
 }
 
 #[derive(Clone, Copy)]
@@ -55,38 +61,81 @@ pub struct SecondDegreeScaled<F: PrimeField> {
 pub enum Term<F: PrimeField> {
     First(Scaled<F>),
     Second(SecondDegreeScaled<F>),
-
     Zero,
 }
 
 impl<F: PrimeField> Composable<F> for Witness<F> {
+    type Scaled = Scaled<F>;
+
     fn value(&self) -> Value<F> {
         self.value
+    }
+
+    fn scale(&self, factor: F) -> Self::Scaled {
+        self * factor
+    }
+
+    fn as_term(&self) -> Term<F> {
+        self.into()
     }
 }
 
 impl<F: PrimeField> Composable<F> for Scaled<F> {
+    type Scaled = Self;
+
     fn value(&self) -> Value<F> {
         self.witness.value().map(|value| value * self.factor)
+    }
+
+    fn scale(&self, factor: F) -> Self::Scaled {
+        self * factor
+    }
+
+    fn as_term(&self) -> Term<F> {
+        self.into()
     }
 }
 
 impl<F: PrimeField> Composable<F> for SecondDegreeScaled<F> {
+    type Scaled = Self;
+
     fn value(&self) -> Value<F> {
         self.w0
             .value()
             .zip(self.w1.value())
             .map(|(w0, w1)| w0 * w1 * self.factor)
     }
+
+    fn scale(&self, factor: F) -> Self::Scaled {
+        self * factor
+    }
+
+    fn as_term(&self) -> Term<F> {
+        self.into()
+    }
 }
 
 impl<F: PrimeField> Composable<F> for Term<F> {
+    type Scaled = Self;
+
     fn value(&self) -> Value<F> {
         match self {
             Self::First(e) => e.value(),
             Self::Second(e) => e.value(),
             Self::Zero => Value::known(F::ZERO),
         }
+    }
+
+    fn scale(&self, factor: F) -> Self::Scaled {
+        match self {
+            Self::First(e) => e.scale(factor).into(),
+            Self::Second(e) => e.scale(factor).into(),
+            Self::Zero => self.clone(),
+        }
+    }
+
+    fn as_term(&self) -> Term<F> {
+        self.clone()
     }
 }
 
@@ -133,10 +182,6 @@ impl<F: PrimeField> Witness<F> {
 
     pub fn sub(&self) -> Scaled<F> {
         Scaled::sub(self)
-    }
-
-    pub fn scale(&self, scale: F) -> Scaled<F> {
-        Scaled::new(self, scale)
     }
 
     pub fn decompose<const NUMBER_OF_LIMBS: usize, const LIMB_SIZE: usize>(
@@ -194,10 +239,6 @@ impl<F: PrimeField> Scaled<F> {
     pub fn neg(&self) -> Self {
         Self::new(&self.witness, -self.factor)
     }
-
-    pub fn scale(&self, scale: F) -> Self {
-        Scaled::new(&self.witness, self.factor * scale)
-    }
 }
 
 impl<F: PrimeField> SecondDegreeScaled<F> {
@@ -211,10 +252,6 @@ impl<F: PrimeField> SecondDegreeScaled<F> {
             factor,
         }
     }
-
-    pub fn scale(&self, scale: F) -> Self {
-        SecondDegreeScaled::new(&self.w0, &self.w1, self.factor * scale)
-    }
 }
 
 impl<F: PrimeField> Term<F> {
@@ -223,14 +260,6 @@ impl<F: PrimeField> Term<F> {
             Self::First(e) => e.is_empty(),
             Self::Second(e) => e.is_empty(),
             Self::Zero => true,
-        }
-    }
-
-    pub fn scale(&self, factor: F) -> Term<F> {
-        match self {
-            Self::First(e) => e.scale(factor).into(),
-            Self::Second(e) => e.scale(factor).into(),
-            Self::Zero => Self::Zero,
         }
     }
 }
@@ -350,5 +379,61 @@ impl<F: PrimeField> std::ops::Mul<&F> for Witness<F> {
     type Output = Scaled<F>;
     fn mul(self, rhs: &F) -> Self::Output {
         Scaled::new(&self, *rhs)
+    }
+}
+
+impl<F: PrimeField> std::ops::Mul<F> for Scaled<F> {
+    type Output = Self;
+    fn mul(self, rhs: F) -> Self::Output {
+        Scaled::new(&self.witness, rhs * self.factor)
+    }
+}
+
+impl<F: PrimeField> std::ops::Mul<F> for &Scaled<F> {
+    type Output = Scaled<F>;
+    fn mul(self, rhs: F) -> Self::Output {
+        Scaled::new(&self.witness, rhs * self.factor)
+    }
+}
+
+impl<F: PrimeField> std::ops::Mul<&F> for &Scaled<F> {
+    type Output = Scaled<F>;
+    fn mul(self, rhs: &F) -> Self::Output {
+        Scaled::new(&self.witness, *rhs * self.factor)
+    }
+}
+
+impl<F: PrimeField> std::ops::Mul<&F> for Scaled<F> {
+    type Output = Self;
+    fn mul(self, rhs: &F) -> Self::Output {
+        Scaled::new(&self.witness, *rhs * self.factor)
+    }
+}
+
+impl<F: PrimeField> std::ops::Mul<F> for SecondDegreeScaled<F> {
+    type Output = Self;
+    fn mul(self, rhs: F) -> Self::Output {
+        SecondDegreeScaled::new(&self.w0, &self.w1, rhs * self.factor)
+    }
+}
+
+impl<F: PrimeField> std::ops::Mul<F> for &SecondDegreeScaled<F> {
+    type Output = SecondDegreeScaled<F>;
+    fn mul(self, rhs: F) -> Self::Output {
+        SecondDegreeScaled::new(&self.w0, &self.w1, rhs * self.factor)
+    }
+}
+
+impl<F: PrimeField> std::ops::Mul<&F> for &SecondDegreeScaled<F> {
+    type Output = SecondDegreeScaled<F>;
+    fn mul(self, rhs: &F) -> Self::Output {
+        SecondDegreeScaled::new(&self.w0, &self.w1, *rhs * self.factor)
+    }
+}
+
+impl<F: PrimeField> std::ops::Mul<&F> for SecondDegreeScaled<F> {
+    type Output = Self;
+    fn mul(self, rhs: &F) -> Self::Output {
+        SecondDegreeScaled::new(&self.w0, &self.w1, *rhs * self.factor)
     }
 }

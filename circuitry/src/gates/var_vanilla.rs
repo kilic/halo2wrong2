@@ -497,7 +497,7 @@ impl<F: PrimeField, const W: usize> VarVanillaGate<F, W> {
             self.assign(ctx, chunk_size, &t)?;
 
             // update running sum
-            sum = sum + Scaled::compose(chunk, constant);
+            sum = sum + Scaled::sum(chunk, constant);
 
             #[cfg(feature = "prover-sanity")]
             if in_last_iter {
