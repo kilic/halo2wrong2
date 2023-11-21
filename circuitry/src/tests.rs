@@ -55,7 +55,7 @@ pub fn rand_value_in_range<F: PrimeField>(bit_size: usize) -> Value<F> {
 impl<F: PrimeField + Ord, const MEM_W: usize> Stack<F, MEM_W> {
     pub(crate) fn _assign_witness(&mut self, w: &Witness<F>) {
         let e = FirstDegreeComposition::new(vec![w.add(), w.sub()], F::ZERO);
-        self.first_degree_ternary_compositions.push(e);
+        self.first_degree_compositions.push(e);
     }
 
     pub(crate) fn _rand_witness(&mut self) -> Witness<F> {
@@ -243,7 +243,6 @@ mod test_composition {
             let ly = &mut LayoutCtx::new(ly);
 
             stack.layout_first_degree_compositions(ly, &cfg.vertical_gate)?;
-            stack.layout_first_degree_ternary_compositions(ly, &cfg.vertical_gate)?;
             stack.layout_range_compositions(ly, &cfg.vertical_gate)?;
             stack.layout_range_tables(ly, &cfg.vertical_gate)?;
             stack.apply_indirect_copies(ly)?;
@@ -303,7 +302,6 @@ mod test_composition {
             let ly = &mut LayoutCtx::new(ly);
 
             stack.layout_first_degree_compositions(ly, &cfg.vanilla_gate)?;
-            stack.layout_first_degree_ternary_compositions(ly, &cfg.vanilla_gate)?;
             stack.layout_range_compositions(ly, &cfg.vanilla_gate)?;
             stack.layout_second_degree_compositions(ly, &cfg.vanilla_gate)?;
             stack.apply_indirect_copies(ly)?;
@@ -361,7 +359,6 @@ mod test_composition {
             let ly = &mut LayoutCtx::new(ly);
 
             stack.layout_first_degree_compositions(ly, &cfg.vanilla_gate)?;
-            stack.layout_first_degree_ternary_compositions(ly, &cfg.vanilla_gate)?;
             stack.layout_range_compositions(ly, &cfg.vanilla_gate)?;
             stack.layout_second_degree_compositions(ly, &cfg.vanilla_gate)?;
             stack.apply_indirect_copies(ly)?;
@@ -581,7 +578,6 @@ mod test_arithmetic {
             let mut stack = make_stack::<_>();
             let ly = &mut LayoutCtx::new(ly);
             stack.layout_first_degree_compositions(ly, &cfg.vanilla_gate)?;
-            stack.layout_first_degree_ternary_compositions(ly, &cfg.vanilla_gate)?;
             stack.layout_range_compositions(ly, &cfg.vanilla_gate)?;
             stack.layout_second_degree_compositions(ly, &cfg.vanilla_gate)?;
             stack.layout_selections(ly, &cfg.select_gate)?;
@@ -638,7 +634,6 @@ mod test_arithmetic {
             let ly = &mut LayoutCtx::new(ly);
 
             stack.layout_first_degree_compositions(ly, &cfg.vanilla_gate)?;
-            stack.layout_first_degree_ternary_compositions(ly, &cfg.vanilla_gate)?;
             stack.layout_range_compositions(ly, &cfg.vanilla_gate)?;
             stack.layout_second_degree_compositions(ly, &cfg.vanilla_gate)?;
             stack.layout_selections(ly, &cfg.vanilla_gate)?;
@@ -736,7 +731,7 @@ mod test_arithmetic {
         fn synthesize(&self, cfg: Self::Config, ly: impl Layouter<F>) -> Result<(), Error> {
             let mut stack = make_stack_simpler::<_>();
             let ly = &mut LayoutCtx::new(ly);
-            stack.layout_first_degree_ternary_compositions(ly, &cfg.vertical_gate)?;
+            stack.layout_first_degree_compositions(ly, &cfg.vertical_gate)?;
             stack.apply_indirect_copies(ly)?;
             Ok(())
         }
@@ -881,7 +876,6 @@ mod test_rom {
             let mut stack = make_stack::<_, 3>();
             let ly = &mut LayoutCtx::new(ly);
             stack.layout_first_degree_compositions(ly, &cfg.vanilla_gate)?;
-            stack.layout_first_degree_ternary_compositions(ly, &cfg.vanilla_gate)?;
             stack.layout_second_degree_compositions(ly, &cfg.vanilla_gate)?;
             stack.layout_rom(ly, &cfg.rom_gate)?;
             stack.apply_indirect_copies(ly)?;

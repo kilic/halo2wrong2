@@ -274,11 +274,9 @@ impl<
         stack.layout_range_tables(ly_ctx, &cfg.vertical_gate)?;
 
         stack.layout_first_degree_compositions(ly_ctx, &cfg.vanilla_gate)?;
-        stack.layout_first_degree_ternary_compositions(ly_ctx, &cfg.vanilla_gate)?;
         stack.layout_second_degree_compositions(ly_ctx, &cfg.vanilla_gate)?;
 
         stack.layout_rom(ly_ctx, &cfg.rom_gate)?;
-
         // stack.layout_selections(ly_ctx, &cfg.select_gate)?;
 
         stack.apply_indirect_copies(ly_ctx)?;
@@ -303,18 +301,20 @@ fn run_test<
 {
     // let aux_generator = Value::known(C::CurveExt::random(OsRng).into());
     let aux_generator = Value::known(C::CurveExt::generator().into());
-    let circuit = TestCircuit::<C, R, NUMBER_OF_LIMBS, LIMB_SIZE, NUMBER_OF_SUBLIMBS, SUBLIMB_SIZE> {
-        aux_generator,
-        number_of_points,
-        window,
-        _marker: PhantomData,
-    };
+    let circuit =
+        TestCircuit::<C, R, NUMBER_OF_LIMBS, LIMB_SIZE, NUMBER_OF_SUBLIMBS, SUBLIMB_SIZE> {
+            aux_generator,
+            number_of_points,
+            window,
+            _marker: PhantomData,
+        };
     // let public_inputs = vec![vec![]];
     let public_inputs = vec![];
-    let prover = match MockProver::run(k, &circuit, public_inputs) {
-        Ok(prover) => prover,
-        Err(e) => panic!("{e:#}"),
-    };
+    let prover =
+        match MockProver::run(k, &circuit, public_inputs) {
+            Ok(prover) => prover,
+            Err(e) => panic!("{e:#}"),
+        };
     prover.assert_satisfied();
 }
 
@@ -376,14 +376,15 @@ fn run_test_prover<
     let mut transcript = Blake2bWrite::<_, _, Challenge255<_>>::init(vec![]);
 
     let t0 = start_timer!(|| "prover");
-    let proof = create_proof::<KZGCommitmentScheme<Bn256>, ProverSHPLONK<Bn256>, _, _, _, _>(
-        &params,
-        &pk,
-        &[circuit],
-        &[&[]],
-        OsRng,
-        &mut transcript,
-    );
+    let proof =
+        create_proof::<KZGCommitmentScheme<Bn256>, ProverSHPLONK<Bn256>, _, _, _, _>(
+            &params,
+            &pk,
+            &[circuit],
+            &[&[]],
+            OsRng,
+            &mut transcript,
+        );
     end_timer!(t0);
 
     proof.expect("proof generation should not fail");
@@ -394,12 +395,13 @@ fn run_test_prover<
 fn bench_prover() {
     let aux_generator = Value::known(G1::random(OsRng).into());
 
-    let circuit = TestCircuit::<G1Affine, RangeInPlaceGate<Fr, 1>, 3, 90, 5, 18> {
-        aux_generator,
-        number_of_points: 100,
-        window: 4,
-        _marker: PhantomData,
-    };
+    let circuit =
+        TestCircuit::<G1Affine, RangeInPlaceGate<Fr, 1>, 3, 90, 5, 18> {
+            aux_generator,
+            number_of_points: 100,
+            window: 4,
+            _marker: PhantomData,
+        };
 
     run_test_prover::<
         3,  // number of limbs

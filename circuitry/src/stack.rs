@@ -33,8 +33,6 @@ pub struct Stack<F: PrimeField + Ord, const MEM_W: usize> {
     pub(crate) range_tables: BTreeSet<usize>,
     // ranged composition
     pub(crate) range_compositions: Vec<FirstDegreeComposition<F>>,
-    // named as ternary but can be binary as well as can include 4th operand as constant
-    pub(crate) first_degree_ternary_compositions: Vec<FirstDegreeComposition<F>>,
     // other first degree compositions
     pub(crate) first_degree_compositions: Vec<FirstDegreeComposition<F>>,
     // second degree enforcements to be layouted
@@ -137,36 +135,6 @@ impl<F: PrimeField + Ord, const MEM_W: usize> Stack<F, MEM_W> {
         Ok(())
     }
 
-    pub fn layout_first_degree_ternary_compositions<
-        L: Layouter<F>,
-        Gate: GateLayout<F, Vec<FirstDegreeComposition<F>>>,
-    >(
-        &mut self,
-        ly: &mut LayoutCtx<F, L>,
-        gate: &Gate,
-    ) -> Result<(), Error> {
-        println!("Layout simple composition (ternaries with a constant)");
-        let e = std::mem::take(&mut self.first_degree_ternary_compositions);
-        gate.layout(ly, e)?;
-        Ok(())
-    }
-
-    #[cfg(test)]
-    pub fn layout_first_degree_ternary_compositions_no_constant<
-        L: Layouter<F>,
-        Gate: GateLayout<F, Vec<FirstDegreeComposition<F>>>,
-    >(
-        &mut self,
-        ly: &mut LayoutCtx<F, L>,
-        gate: &Gate,
-    ) -> Result<(), Error> {
-        println!("Layout simple composition no constant");
-        let e = std::mem::take(&mut self.first_degree_ternary_compositions);
-        let e: Vec<_> = e.iter().filter(|e| !e.has_constant()).cloned().collect();
-        gate.layout(ly, e)?;
-        Ok(())
-    }
-
     pub fn layout_second_degree_compositions<
         L: Layouter<F>,
         Gate: GateLayout<F, Vec<SecondDegreeComposition<F>>>,
@@ -249,8 +217,6 @@ impl<F: PrimeField + Ord, const MEM_W: usize> Chip<FirstDegreeComposition<F>, F>
     fn new_op(&mut self, e: FirstDegreeComposition<F>) {
         if e.is_range_demoposition() {
             self.range_compositions.push(e)
-        } else if e.is_simple() {
-            self.first_degree_ternary_compositions.push(e);
         } else {
             self.first_degree_compositions.push(e);
         }

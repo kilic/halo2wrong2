@@ -61,12 +61,13 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const LIMB_SIZE
         &self,
         bit_len: usize,
     ) -> UnassignedInteger<W, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
-        let limbs = (0..NUMBER_OF_LIMBS)
-            .map(|_| {
-                let e = &OsRng.gen_biguint(bit_len as u64);
-                big_to_fe(e)
-            })
-            .collect::<Vec<N>>();
+        let limbs =
+            (0..NUMBER_OF_LIMBS)
+                .map(|_| {
+                    let e = &OsRng.gen_biguint(bit_len as u64);
+                    big_to_fe(e)
+                })
+                .collect::<Vec<N>>();
         UnassignedInteger::from_limbs(Value::known(limbs.try_into().unwrap()))
     }
 
@@ -412,21 +413,25 @@ impl<
     }
 
     fn synthesize(&self, cfg: Self::Config, ly: impl Layouter<N>) -> Result<(), Error> {
-        let mut stack =
-            make_stack::<W, N, NUMBER_OF_LIMBS, LIMB_SIZE, NUMBER_OF_SUBLIMBS, SUBLIMB_SIZE>(
-                &cfg.rns,
-            );
+        let mut stack = make_stack::<
+            W,
+            N,
+            NUMBER_OF_LIMBS,
+            LIMB_SIZE,
+            NUMBER_OF_SUBLIMBS,
+            SUBLIMB_SIZE,
+        >(&cfg.rns);
 
         let ly_ctx = &mut LayoutCtx::new(ly);
 
         stack.layout_first_degree_compositions(ly_ctx, &cfg.vertical_gate)?;
 
         stack.layout_second_degree_compositions(ly_ctx, &cfg.vanilla_gate)?;
-        stack.layout_first_degree_ternary_compositions(ly_ctx, &cfg.vanilla_gate)?;
-        stack.layout_range_compositions(ly_ctx, &cfg.vanilla_gate)?;
-        stack.layout_selections(ly_ctx, &cfg.vanilla_gate)?;
 
+        stack.layout_range_compositions(ly_ctx, &cfg.vanilla_gate)?;
         stack.layout_range_tables(ly_ctx, &cfg.vertical_gate)?;
+
+        stack.layout_selections(ly_ctx, &cfg.vanilla_gate)?;
 
         stack.apply_indirect_copies(ly_ctx)?;
 
@@ -451,10 +456,11 @@ fn run_test<
         };
     // let public_inputs = vec![vec![]];
     let public_inputs = vec![];
-    let prover = match MockProver::run(k, &circuit, public_inputs) {
-        Ok(prover) => prover,
-        Err(e) => panic!("{e:#}"),
-    };
+    let prover =
+        match MockProver::run(k, &circuit, public_inputs) {
+            Ok(prover) => prover,
+            Err(e) => panic!("{e:#}"),
+        };
     prover.assert_satisfied();
 }
 
