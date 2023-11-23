@@ -1,7 +1,7 @@
 use circuitry::{
     chip::{
-        first_degree::FirstDegreeChip, second_degree::SecondDegreeChip, select::SelectChip, Core,
-        ROMChip,
+        first_degree::FirstDegreeChip, range::RangeChip, second_degree::SecondDegreeChip,
+        select::SelectChip, Core, ROMChip,
     },
     witness::Witness,
 };
@@ -21,17 +21,9 @@ pub struct BaseFieldEccChip<
     C: CurveAffine,
     const NUMBER_OF_LIMBS: usize,
     const LIMB_SIZE: usize,
-    const NUMBER_OF_SUBLIMBS: usize,
     const SUBLIMB_SIZE: usize,
 > {
-    pub ch: IntegerChip<
-        C::Base,
-        C::Scalar,
-        NUMBER_OF_LIMBS,
-        LIMB_SIZE,
-        NUMBER_OF_SUBLIMBS,
-        SUBLIMB_SIZE,
-    >,
+    pub ch: IntegerChip<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE>,
     aux_generator: Value<C>,
     b: ConstantInteger<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>,
 }
@@ -40,9 +32,8 @@ impl<
         C: CurveAffine,
         const NUMBER_OF_LIMBS: usize,
         const LIMB_SIZE: usize,
-        const NUMBER_OF_SUBLIMBS: usize,
         const SUBLIMB_SIZE: usize,
-    > BaseFieldEccChip<C, NUMBER_OF_LIMBS, LIMB_SIZE, NUMBER_OF_SUBLIMBS, SUBLIMB_SIZE>
+    > BaseFieldEccChip<C, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE>
 {
     pub fn new(
         rns: &Rns<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>,
@@ -85,22 +76,25 @@ impl<
         Point::new(x, y)
     }
 
-    pub fn assign_point<Stack: SecondDegreeChip<C::Scalar> + FirstDegreeChip<C::Scalar>>(
+    pub fn assign_point<
+        Stack: SecondDegreeChip<C::Scalar> + FirstDegreeChip<C::Scalar> + RangeChip<C::Scalar>,
+    >(
         &self,
         stack: &mut Stack,
         point: Value<C>,
     ) -> Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE> {
-        let (x, y) = point
-            .map(|point| {
-                let coords = point.coordinates();
-                // disallow point of infinity
-                // it will not pass assing point enforcement
-                let coords = coords.unwrap();
-                let x = coords.x();
-                let y = coords.y();
-                (*x, *y)
-            })
-            .unzip();
+        let (x, y) =
+            point
+                .map(|point| {
+                    let coords = point.coordinates();
+                    // disallow point of infinity
+                    // it will not pass assing point enforcement
+                    let coords = coords.unwrap();
+                    let x = coords.x();
+                    let y = coords.y();
+                    (*x, *y)
+                })
+                .unzip();
 
         let x = &self
             .ch
@@ -157,7 +151,9 @@ impl<
         Point::new(x, y)
     }
 
-    pub fn assert_on_curve<Stack: SecondDegreeChip<C::Scalar> + FirstDegreeChip<C::Scalar>>(
+    pub fn assert_on_curve<
+        Stack: SecondDegreeChip<C::Scalar> + FirstDegreeChip<C::Scalar> + RangeChip<C::Scalar>,
+    >(
         &self,
         stack: &mut Stack,
         point: &Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>,
@@ -179,7 +175,9 @@ impl<
         self.ch.copy_equal(stack, p0.y(), p1.y());
     }
 
-    pub fn normal_equal<Stack: SecondDegreeChip<C::Scalar> + FirstDegreeChip<C::Scalar>>(
+    pub fn normal_equal<
+        Stack: SecondDegreeChip<C::Scalar> + FirstDegreeChip<C::Scalar> + RangeChip<C::Scalar>,
+    >(
         &self,
         stack: &mut Stack,
 
@@ -191,7 +189,9 @@ impl<
         self.ch.normal_equal(stack, p0.y(), p1.y());
     }
 
-    pub fn normalize<Stack: SecondDegreeChip<C::Scalar> + FirstDegreeChip<C::Scalar>>(
+    pub fn normalize<
+        Stack: SecondDegreeChip<C::Scalar> + FirstDegreeChip<C::Scalar> + RangeChip<C::Scalar>,
+    >(
         &self,
         stack: &mut Stack,
 
@@ -286,7 +286,9 @@ impl<
     //     reducer[0].clone()
     // }
 
-    pub fn add_incomplete<Stack: SecondDegreeChip<C::Scalar> + FirstDegreeChip<C::Scalar>>(
+    pub fn add_incomplete<
+        Stack: SecondDegreeChip<C::Scalar> + FirstDegreeChip<C::Scalar> + RangeChip<C::Scalar>,
+    >(
         &self,
         stack: &mut Stack,
 
@@ -309,7 +311,9 @@ impl<
         Point::new(x, y)
     }
 
-    pub fn sub_incomplete<Stack: SecondDegreeChip<C::Scalar> + FirstDegreeChip<C::Scalar>>(
+    pub fn sub_incomplete<
+        Stack: SecondDegreeChip<C::Scalar> + FirstDegreeChip<C::Scalar> + RangeChip<C::Scalar>,
+    >(
         &self,
         stack: &mut Stack,
 
@@ -333,7 +337,9 @@ impl<
         Point::new(x, y)
     }
 
-    pub fn double_incomplete<Stack: SecondDegreeChip<C::Scalar> + FirstDegreeChip<C::Scalar>>(
+    pub fn double_incomplete<
+        Stack: SecondDegreeChip<C::Scalar> + FirstDegreeChip<C::Scalar> + RangeChip<C::Scalar>,
+    >(
         &self,
         stack: &mut Stack,
 
@@ -374,7 +380,9 @@ impl<
 
     // ported from barretenberg
     // https://github.com/AztecProtocol/barretenberg/blob/master/cpp/src/barretenberg/stdlib/primitives/biggroup/biggroup_impl.hpp
-    pub fn add_multi<Stack: SecondDegreeChip<C::Scalar> + FirstDegreeChip<C::Scalar>>(
+    pub fn add_multi<
+        Stack: SecondDegreeChip<C::Scalar> + FirstDegreeChip<C::Scalar> + RangeChip<C::Scalar>,
+    >(
         &self,
         stack: &mut Stack,
 
@@ -406,12 +414,13 @@ impl<
         let t = &self.ch.add(stack, &p0.x, &p1.x);
         let t = &self.ch.neg(stack, t);
         let x_cur = self.ch.square(stack, &lambda, &[&t]);
-        let mut state = State {
-            x_prev: p0.x.clone(),
-            y_prev: p0.y.clone(),
-            x_cur,
-            lambda,
-        };
+        let mut state =
+            State {
+                x_prev: p0.x.clone(),
+                y_prev: p0.y.clone(),
+                x_cur,
+                lambda,
+            };
 
         for point in points.iter().skip(2) {
             let t = &self.ch.sub(stack, &state.x_cur, &state.x_prev);
@@ -434,7 +443,7 @@ impl<
         Point::new(&state.x_cur, &y_cur)
     }
 
-    // pub fn ladder_incomplete<Stack: SecondDegreeChip<C::Scalar> + FirstDegreeChip<C::Scalar>>(
+    // pub fn ladder_incomplete<Stack: SecondDegreeChip<C::Scalar> + FirstDegreeChip<C::Scalar>+ RangeChip<C::Scalar>>(
     //     &self,
     //     stack: &mut Stack,
 

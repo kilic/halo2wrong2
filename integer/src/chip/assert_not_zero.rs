@@ -1,6 +1,7 @@
 use crate::chip::IntegerChip;
 use crate::integer::Integer;
 use circuitry::chip::first_degree::FirstDegreeChip;
+use circuitry::chip::range::RangeChip;
 use circuitry::chip::second_degree::SecondDegreeChip;
 use circuitry::witness::Scaled;
 use ff::PrimeField;
@@ -11,11 +12,10 @@ impl<
         N: PrimeField + Ord,
         const NUMBER_OF_LIMBS: usize,
         const LIMB_SIZE: usize,
-        const NUMBER_OF_SUBLIMBS: usize,
         const SUBLIMB_SIZE: usize,
-    > IntegerChip<W, N, NUMBER_OF_LIMBS, LIMB_SIZE, NUMBER_OF_SUBLIMBS, SUBLIMB_SIZE>
+    > IntegerChip<W, N, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE>
 {
-    pub fn assert_not_zero<Stack: SecondDegreeChip<N> + FirstDegreeChip<N>>(
+    pub fn assert_not_zero<Stack: SecondDegreeChip<N> + FirstDegreeChip<N> + RangeChip<N>>(
         &self,
         stack: &mut Stack,
         w0: &Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,

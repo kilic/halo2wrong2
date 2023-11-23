@@ -227,11 +227,13 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const LIMB_SIZE
         match range {
             Range::Remainder => self.max_remainder_limbs.clone(),
             Range::Operand => self.max_operand_limbs.clone(),
-            Range::Unreduced => std::iter::repeat_with(|| self._max_unreduced_limb.clone())
-                .take(NUMBER_OF_LIMBS)
-                .collect::<Vec<_>>()
-                .try_into()
-                .unwrap(),
+            Range::Unreduced => {
+                std::iter::repeat_with(|| self._max_unreduced_limb.clone())
+                    .take(NUMBER_OF_LIMBS)
+                    .collect::<Vec<_>>()
+                    .try_into()
+                    .unwrap()
+            }
             Range::MulQuotient => self.max_quotient_limbs.clone(),
         }
     }
@@ -349,19 +351,20 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const LIMB_SIZE
         let k = numer_max / &self.wrong_modulus;
         let shifter = k * &self.wrong_modulus;
 
-        let (result, quotient) = numer
-            .big()
-            .zip(denom.big())
-            .map(|(numer, denom)| {
-                let denom_inv = invert::<W>(&denom);
-                let result = (&denom_inv * &numer) % &self.wrong_modulus;
-                let (quotient, _must_be_zero) =
-                    (&denom * &result + &shifter - &numer).div_rem(&self.wrong_modulus);
-                assert_eq!(_must_be_zero, BigUint::zero());
+        let (result, quotient) =
+            numer
+                .big()
+                .zip(denom.big())
+                .map(|(numer, denom)| {
+                    let denom_inv = invert::<W>(&denom);
+                    let result = (&denom_inv * &numer) % &self.wrong_modulus;
+                    let (quotient, _must_be_zero) =
+                        (&denom * &result + &shifter - &numer).div_rem(&self.wrong_modulus);
+                    assert_eq!(_must_be_zero, BigUint::zero());
 
-                (result, quotient)
-            })
-            .unzip();
+                    (result, quotient)
+                })
+                .unzip();
 
         #[cfg(feature = "synth-sanity")]
         {

@@ -25,14 +25,14 @@ pub trait Composable<F: PrimeField>: Sized {
 pub struct Witness<F: PrimeField> {
     pub(crate) id: Option<u32>,
     pub(crate) value: Value<F>,
-    pub(crate) range: Option<usize>,
+    // pub(crate) range: Option<usize>,
 }
 
 impl<F: PrimeField> Debug for Witness<F> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut debug = f.debug_struct("Witness");
         debug.field("id", &self.id);
-        debug.field("range", &self.range);
+        // debug.field("range", &self.range);
 
         self.value().map(|value| {
             let bit_size = fe_to_big(&value).bits();
@@ -144,15 +144,15 @@ impl<F: PrimeField> Witness<F> {
         Witness {
             id: Some(id),
             value,
-            range: None,
+            // range: None,
         }
     }
 
-    pub fn new_in_range(id: u32, value: Value<F>, bit_size: usize) -> Self {
+    pub fn new_in_range(id: u32, value: Value<F>, _bit_size: usize) -> Self {
         Witness {
             id: Some(id),
             value,
-            range: Some(bit_size),
+            // range: Some(bit_size),
         }
     }
 
@@ -160,7 +160,7 @@ impl<F: PrimeField> Witness<F> {
         Witness {
             id: None,
             value,
-            range: None,
+            // range: None,
         }
     }
 

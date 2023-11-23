@@ -11,9 +11,8 @@ impl<
         N: PrimeField + Ord,
         const NUMBER_OF_LIMBS: usize,
         const LIMB_SIZE: usize,
-        const NUMBER_OF_SUBLIMBS: usize,
         const SUBLIMB_SIZE: usize,
-    > IntegerChip<W, N, NUMBER_OF_LIMBS, LIMB_SIZE, NUMBER_OF_SUBLIMBS, SUBLIMB_SIZE>
+    > IntegerChip<W, N, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE>
 {
     pub fn add(
         &self,

@@ -15,11 +15,13 @@ pub mod var_vanilla;
 pub mod vertical;
 
 pub trait GateLayout<F: PrimeField + Ord, E> {
+    type Output;
+
     fn layout<L: Layouter<F>>(
         &self,
         ly_ctx: &mut LayoutCtx<F, L>,
         enforcements: E,
-    ) -> Result<(), Error>;
+    ) -> Result<Self::Output, Error>;
 }
 
 pub trait GateConfig<F: PrimeField + Ord>: Clone {

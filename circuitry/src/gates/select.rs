@@ -1,7 +1,3 @@
-// c*w0 - c*w1 + w1 - selected = 0
-
-use std::marker::PhantomData;
-
 use ff::PrimeField;
 use halo2::{
     circuit::Layouter,
@@ -14,20 +10,18 @@ use crate::{enforcement::Selection, witness::Composable, LayoutCtx};
 use super::GateLayout;
 
 #[derive(Clone, Debug)]
-pub struct SelectGate<F: PrimeField + Ord> {
+pub struct SelectGate {
     pub(crate) selector: Selector,
 
     pub(crate) cond: Column<Advice>,
     pub(crate) w0: Column<Advice>,
     pub(crate) w1: Column<Advice>,
     pub(crate) selected: Column<Advice>,
-
-    pub(crate) _marker: PhantomData<F>,
 }
 
-impl<F: PrimeField + Ord> SelectGate<F> {
+impl SelectGate {
     #[allow(clippy::too_many_arguments)]
-    pub fn new(
+    pub fn configure<F: PrimeField>(
         meta: &mut ConstraintSystem<F>,
         cond: Column<Advice>,
         w0: Column<Advice>,
@@ -41,30 +35,29 @@ impl<F: PrimeField + Ord> SelectGate<F> {
 
         let selector = meta.selector();
 
+        meta.create_gate("select", |meta| {
+            let cond = meta.query_advice(cond, Rotation::cur());
+            let w0 = meta.query_advice(w0, Rotation::cur());
+            let w1 = meta.query_advice(w1, Rotation::cur());
+            let selected = meta.query_advice(selected, Rotation::cur());
+            let selector = meta.query_selector(selector);
+            let expression = cond * (w0 - w1.clone()) + w1 - selected;
+            Constraints::with_selector(selector, vec![expression])
+        });
+
         Self {
             selector,
             cond,
             w0,
             w1,
             selected,
-            _marker: PhantomData,
         }
-    }
-
-    pub fn configure(&self, meta: &mut ConstraintSystem<F>) {
-        meta.create_gate("select", |meta| {
-            let cond = meta.query_advice(self.cond, Rotation::cur());
-            let w0 = meta.query_advice(self.w0, Rotation::cur());
-            let w1 = meta.query_advice(self.w1, Rotation::cur());
-            let selected = meta.query_advice(self.selected, Rotation::cur());
-            let selector = meta.query_selector(self.selector);
-            let expression = cond * (w0 - w1.clone()) + w1 - selected;
-            Constraints::with_selector(selector, vec![expression])
-        });
     }
 }
 
-impl<F: PrimeField + Ord> GateLayout<F, Vec<Selection<F>>> for SelectGate<F> {
+impl<F: PrimeField + Ord> GateLayout<F, Vec<Selection<F>>> for SelectGate {
+    type Output = ();
+
     fn layout<L: Layouter<F>>(
         &self,
         ly_ctx: &mut LayoutCtx<F, L>,
@@ -73,7 +66,6 @@ impl<F: PrimeField + Ord> GateLayout<F, Vec<Selection<F>>> for SelectGate<F> {
         #[cfg(feature = "info")]
         {
             println!("---");
-            println!("select gate");
             println!("* number of selects: {}", e.len());
         }
 
@@ -103,6 +95,12 @@ impl<F: PrimeField + Ord> GateLayout<F, Vec<Selection<F>>> for SelectGate<F> {
                 Ok(ctx.offset())
             },
         )?;
+
+        #[cfg(feature = "info")]
+        {
+            println!("* rows: {_offset}");
+            println!();
+        }
 
         Ok(())
     }

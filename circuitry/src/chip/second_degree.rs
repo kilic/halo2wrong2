@@ -1,12 +1,11 @@
-use crate::{
-    enforcement::SecondDegreeComposition,
-    witness::{Composable, Term, Witness},
-};
+use crate::witness::{Composable, Term, Witness};
 use ff::PrimeField;
 
 use super::Chip;
 
-pub trait SecondDegreeChip<F: PrimeField + Ord>: Chip<SecondDegreeComposition<F>, F> {
+pub trait SecondDegreeChip<F: PrimeField + Ord>:
+    Chip<crate::enforcement::SecondDegree<F>, F>
+{
     fn assert_bit(&mut self, w0: &Witness<F>) {
         self.zero_sum_second_degree(&[(w0 * w0).into(), w0.sub().into()], F::ZERO);
     }
@@ -96,7 +95,7 @@ pub trait SecondDegreeChip<F: PrimeField + Ord>: Chip<SecondDegreeComposition<F>
             });
         }
 
-        let composition = SecondDegreeComposition::new(terms, constant_to_add);
+        let composition = crate::enforcement::SecondDegree::new(terms, constant_to_add);
         self.new_op(composition);
     }
 
@@ -106,7 +105,7 @@ pub trait SecondDegreeChip<F: PrimeField + Ord>: Chip<SecondDegreeComposition<F>
         let result = Term::sum(&terms[..], constant_to_add);
         let result = self.new_witness(result).sub();
         terms.push(result.into());
-        let composition = SecondDegreeComposition::new(terms, constant_to_add);
+        let composition = crate::enforcement::SecondDegree::new(terms, constant_to_add);
         self.new_op(composition);
         result.witness
     }

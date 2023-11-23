@@ -1,6 +1,6 @@
 use super::GateLayout;
 use crate::{
-    enforcement::{FirstDegreeComposition, SecondDegreeComposition, Selection},
+    enforcement::{FirstDegree, SecondDegree, Selection},
     witness::{Composable, Scaled, SecondDegreeScaled, Term, Witness},
     LayoutCtx, RegionCtx,
 };
@@ -154,11 +154,12 @@ impl<F: PrimeField + Ord, const W: usize> VarVanillaGate<F, W> {
             .collect::<Vec<_>>()
             .try_into()
             .unwrap();
-        let fixed = (0..W)
-            .map(|_| meta.fixed_column())
-            .collect::<Vec<_>>()
-            .try_into()
-            .unwrap();
+        let fixed =
+            (0..W)
+                .map(|_| meta.fixed_column())
+                .collect::<Vec<_>>()
+                .try_into()
+                .unwrap();
 
         let s_mul = meta.fixed_column();
         let (s_next, constant) = (meta.fixed_column(), meta.fixed_column());
@@ -215,13 +216,15 @@ impl<F: PrimeField + Ord, const W: usize> VarVanillaGate<F, W> {
     }
 }
 
-impl<F: PrimeField + Ord, const W: usize> GateLayout<F, Vec<FirstDegreeComposition<F>>>
+impl<F: PrimeField + Ord, const W: usize> GateLayout<F, Vec<FirstDegree<F>>>
     for VarVanillaGate<F, W>
 {
+    type Output = ();
+
     fn layout<L: Layouter<F>>(
         &self,
         ly_ctx: &mut LayoutCtx<F, L>,
-        e: Vec<FirstDegreeComposition<F>>,
+        e: Vec<FirstDegree<F>>,
     ) -> Result<(), Error> {
         #[cfg(feature = "info")]
         {
@@ -238,7 +241,7 @@ impl<F: PrimeField + Ord, const W: usize> GateLayout<F, Vec<FirstDegreeCompositi
             println!("var vanilla gate, first degree composition");
             println!("* number of compositions: {}", e.len());
             for (n_terms, count) in n_first {
-                println!("* * zerosum n: {n_terms} occurs: {count}");
+                println!("* n: {n_terms} occurs: {count}");
             }
         }
 
@@ -259,7 +262,7 @@ impl<F: PrimeField + Ord, const W: usize> GateLayout<F, Vec<FirstDegreeCompositi
 
         #[cfg(feature = "info")]
         {
-            println!("* * rows: {_offset}");
+            println!("* rows: {_offset}");
             println!();
         }
 
@@ -267,13 +270,15 @@ impl<F: PrimeField + Ord, const W: usize> GateLayout<F, Vec<FirstDegreeCompositi
     }
 }
 
-impl<F: PrimeField + Ord, const W: usize> GateLayout<F, Vec<SecondDegreeComposition<F>>>
+impl<F: PrimeField + Ord, const W: usize> GateLayout<F, Vec<SecondDegree<F>>>
     for VarVanillaGate<F, W>
 {
+    type Output = ();
+
     fn layout<L: Layouter<F>>(
         &self,
         ly_ctx: &mut LayoutCtx<F, L>,
-        e: Vec<SecondDegreeComposition<F>>,
+        e: Vec<SecondDegree<F>>,
     ) -> Result<(), Error> {
         #[cfg(feature = "info")]
         {
@@ -307,7 +312,7 @@ impl<F: PrimeField + Ord, const W: usize> GateLayout<F, Vec<SecondDegreeComposit
 
             for (n_terms, count) in n_second {
                 println!(
-                    "* * zerosum n: {} nn: {} occurs: {}",
+                    "* zerosum n: {} nn: {} occurs: {}",
                     n_terms.0, n_terms.1, count
                 );
             }
@@ -330,7 +335,7 @@ impl<F: PrimeField + Ord, const W: usize> GateLayout<F, Vec<SecondDegreeComposit
 
         #[cfg(feature = "info")]
         {
-            println!("* * rows: {_offset}");
+            println!("* rows: {_offset}");
             println!();
         }
 
@@ -341,6 +346,8 @@ impl<F: PrimeField + Ord, const W: usize> GateLayout<F, Vec<SecondDegreeComposit
 impl<F: PrimeField + Ord, const W: usize> GateLayout<F, Vec<Selection<F>>>
     for VarVanillaGate<F, W>
 {
+    type Output = ();
+
     fn layout<L: Layouter<F>>(
         &self,
         ly_ctx: &mut LayoutCtx<F, L>,
@@ -367,7 +374,7 @@ impl<F: PrimeField + Ord, const W: usize> GateLayout<F, Vec<Selection<F>>>
 
         #[cfg(feature = "info")]
         {
-            println!("* * rows: {_offset}");
+            println!("* rows: {_offset}");
             println!();
         }
 
@@ -515,21 +522,23 @@ impl<F: PrimeField, const W: usize> VarVanillaGate<F, W> {
         terms: &[Term<F>],
         constant: F,
     ) -> Result<(), Error> {
-        let mut first_degree_terms: Vec<Scaled<F>> = terms
-            .iter()
-            .filter_map(|term| match term {
-                Term::First(term) => Some(*term),
-                _ => None,
-            })
-            .collect();
+        let mut first_degree_terms: Vec<Scaled<F>> =
+            terms
+                .iter()
+                .filter_map(|term| match term {
+                    Term::First(term) => Some(*term),
+                    _ => None,
+                })
+                .collect();
 
-        let second_degree_terms: Vec<SecondDegreeScaled<F>> = terms
-            .iter()
-            .filter_map(|term| match term {
-                Term::Second(term) => Some(*term),
-                _ => None,
-            })
-            .collect();
+        let second_degree_terms: Vec<SecondDegreeScaled<F>> =
+            terms
+                .iter()
+                .filter_map(|term| match term {
+                    Term::Second(term) => Some(*term),
+                    _ => None,
+                })
+                .collect();
 
         assert_eq!(
             first_degree_terms.len() + second_degree_terms.len(),
@@ -601,9 +610,9 @@ impl<F: PrimeField, const W: usize> VarVanillaGate<F, W> {
             let in_last_iter = i == second_degree_terms.len() - 1;
 
             // shape the gate:
-            // * * open mul gate
+            // * open mul gate
             self.enable_scaled_mul(ctx, second_degree_term.factor)?;
-            // * * decide next gate
+            // * decide next gate
             if in_last_iter {
                 if !first_degree_terms_rest.is_empty() {
                     // if there is first degree terms left running sum will continue

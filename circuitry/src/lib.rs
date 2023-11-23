@@ -13,10 +13,11 @@ pub mod chip;
 pub mod enforcement;
 pub mod gates;
 pub mod stack;
-#[cfg(test)]
-pub mod tests;
 pub mod utils;
 pub mod witness;
+
+#[cfg(test)]
+pub mod test;
 
 #[derive(Debug)]
 pub struct LayoutCtx<F: PrimeField, L: Layouter<F>> {

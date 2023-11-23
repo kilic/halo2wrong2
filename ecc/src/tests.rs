@@ -1,9 +1,6 @@
-use std::marker::PhantomData;
-
 use ark_std::end_timer;
 use ark_std::start_timer;
-use circuitry::gates::range::in_place::RangeInPlaceGate;
-use circuitry::gates::range::RangeInPlace;
+use circuitry::gates::range::RangeGate;
 use circuitry::gates::rom::ROMGate;
 use circuitry::gates::vanilla::VanillaGate;
 use circuitry::gates::vertical::VerticalGate;
@@ -13,8 +10,7 @@ use ff::FromUniformBytes;
 use ff::PrimeField;
 use group::{Curve, Group};
 
-use halo2::halo2curves::bn256::{Bn256, Fr, G1Affine, G1};
-use halo2::halo2curves::pasta::Fp;
+use halo2::halo2curves::bn256::{Bn256, G1Affine, G1};
 use halo2::halo2curves::CurveExt;
 use halo2::plonk::{create_proof, keygen_pk, keygen_vk, Advice, Column};
 use halo2::poly::commitment::ParamsProver;
@@ -55,7 +51,6 @@ fn make_stack<
     C: CurveAffine,
     const NUMBER_OF_LIMBS: usize,
     const LIMB_SIZE: usize,
-    const NUMBER_OF_SUBLIMBS: usize,
     const SUBLIMB_SIZE: usize,
 >(
     rns: &Rns<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>,
@@ -65,7 +60,7 @@ fn make_stack<
 ) -> Stack<C::Scalar, NUMBER_OF_LIMBS> {
     let stack = &mut Stack::<C::Scalar, NUMBER_OF_LIMBS>::default();
 
-    let ch: BaseFieldEccChip<C, NUMBER_OF_LIMBS, LIMB_SIZE, NUMBER_OF_SUBLIMBS, SUBLIMB_SIZE> =
+    let ch: BaseFieldEccChip<C, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE> =
         BaseFieldEccChip::new(rns, aux_generator);
 
     fn value<T>(e: T) -> Value<T> {
@@ -146,7 +141,7 @@ fn make_stack<
         Vec<Witness<C::ScalarExt>>,
     ) = points
         .into_iter()
-        .zip(scalars.into_iter())
+        .zip(scalars)
         .map(|(point, scalar)| {
             let point = ch.assign_point(stack, value(point.into()));
             let scalar = ch.assign_scalar(stack, value(scalar));
@@ -166,131 +161,127 @@ fn make_stack<
 #[derive(Clone)]
 struct TestConfig<
     C: CurveAffine,
-    R: RangeInPlace<C::Scalar, 1>,
+    const RANGE_W: usize,
     const NUMBER_OF_LIMBS: usize,
     const LIMB_SIZE: usize,
-    const NUMBER_OF_SUBLIMBS: usize,
     const SUBLIMB_SIZE: usize,
 > {
-    vertical_gate: VerticalGate<C::Scalar, R>,
-    vanilla_gate: VanillaGate<C::Scalar>,
-    // select_gate: SelectGate<C::Scalar>,
-    rom_gate: ROMGate<C::Scalar, NUMBER_OF_LIMBS>,
-    rns: Rns<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>,
+    vertical_gate: VerticalGate<RANGE_W>,
+    vanilla_gate: VanillaGate,
+    range_gate: RangeGate,
+    rom_gate: ROMGate<NUMBER_OF_LIMBS>,
+    stack: Stack<C::Scalar, NUMBER_OF_LIMBS>,
+}
+
+#[derive(Default, Clone)]
+struct Params<C: CurveAffine> {
+    aux_generator: Value<C>,
+    number_of_points: usize,
+    window: usize,
 }
 
 #[derive(Default)]
 struct TestCircuit<
     C: CurveAffine,
-    R: RangeInPlace<C::Scalar, 1>,
+    const RANGE_W: usize,
     const NUMBER_OF_LIMBS: usize,
     const LIMB_SIZE: usize,
-    const NUMBER_OF_SUBLIMBS: usize,
     const SUBLIMB_SIZE: usize,
 > {
-    aux_generator: Value<C>,
-    number_of_points: usize,
-    window: usize,
-    _marker: PhantomData<R>,
+    params: Params<C>,
 }
 
 impl<
         C: CurveAffine,
-        R: RangeInPlace<C::Scalar, 1>,
+        const RANGE_W: usize,
         const NUMBER_OF_LIMBS: usize,
         const LIMB_SIZE: usize,
-        const NUMBER_OF_SUBLIMBS: usize,
         const SUBLIMB_SIZE: usize,
-    > Circuit<C::Scalar>
-    for TestCircuit<C, R, NUMBER_OF_LIMBS, LIMB_SIZE, NUMBER_OF_SUBLIMBS, SUBLIMB_SIZE>
+    > Circuit<C::Scalar> for TestCircuit<C, RANGE_W, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE>
 {
-    type Config = TestConfig<C, R, NUMBER_OF_LIMBS, LIMB_SIZE, NUMBER_OF_SUBLIMBS, SUBLIMB_SIZE>;
+    type Config = TestConfig<C, RANGE_W, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE>;
     type FloorPlanner = SimpleFloorPlanner;
+    type Params = Params<C>;
 
-    fn configure(meta: &mut ConstraintSystem<C::Scalar>) -> Self::Config {
-        let rns = Rns::construct();
+    fn configure_with_params(
+        meta: &mut ConstraintSystem<C::Scalar>,
+        params: Self::Params,
+    ) -> Self::Config {
+        let advices = (0..RANGE_W)
+            .map(|_| meta.advice_column())
+            .collect::<Vec<_>>();
 
-        let advice = meta.advice_column();
-        let range_gate = R::configure(meta, [advice]);
-
-        let acc = meta.advice_column();
-        let scale = meta.fixed_column();
-
-        let mut vertical_gate = VerticalGate::new(meta, range_gate, scale, advice, acc);
-        vertical_gate.configure_composition_gate(meta);
-
-        let vanilla_gate = VanillaGate::new(meta);
-        vanilla_gate.configure(meta);
+        let range_gate = RangeGate::configure(meta, &advices[..]);
+        let vertical_gate = VerticalGate::configure(meta, &range_gate, advices.try_into().unwrap());
+        let vanilla_gate = VanillaGate::configure(meta);
 
         let shared_columns = vanilla_gate.advice_colums();
         let rom_value_columns: [Column<Advice>; NUMBER_OF_LIMBS] =
             shared_columns[0..NUMBER_OF_LIMBS].try_into().unwrap();
-        let query_fraction = vertical_gate.advice_column();
+        let query_fraction = vertical_gate.advice_columns()[0];
 
         let rom_gate =
             ROMGate::configure(meta, query_fraction, rom_value_columns, rom_value_columns);
 
-        // let select_gate = SelectGate::new(
-        //     meta,
-        //     shared_columns[0],
-        //     shared_columns[1],
-        //     shared_columns[2],
-        //     shared_columns[3],
-        // );
-        // select_gate.configure(meta);
+        let rns = Rns::construct();
+
+        let t0 = start_timer!(|| "witness gen");
+        let stack =
+            make_stack::<C, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE>(
+                &rns,
+                params.aux_generator,
+                params.window,
+                params.number_of_points,
+            );
+        end_timer!(t0);
 
         Self::Config {
-            rns,
+            stack,
+            range_gate,
             vertical_gate,
             vanilla_gate,
             rom_gate,
         }
-        // select_gate,
+    }
+
+    fn configure(_meta: &mut ConstraintSystem<C::Scalar>) -> Self::Config {
+        unreachable!();
     }
 
     fn without_witnesses(&self) -> Self {
         Self {
-            aux_generator: Value::unknown(),
-            number_of_points: self.number_of_points,
-            window: self.window,
-            _marker: PhantomData,
+            params: self.params.clone(),
         }
     }
 
-    fn synthesize(&self, cfg: Self::Config, ly: impl Layouter<C::Scalar>) -> Result<(), Error> {
-        // let t0 = start_timer!(|| "stack");
-        // println!("synth");
-
-        let mut stack = make_stack::<C, NUMBER_OF_LIMBS, LIMB_SIZE, NUMBER_OF_SUBLIMBS, SUBLIMB_SIZE>(
-            &cfg.rns,
-            self.aux_generator,
-            self.window,
-            self.number_of_points,
-        );
-
+    fn synthesize(&self, mut cfg: Self::Config, ly: impl Layouter<C::Scalar>) -> Result<(), Error> {
         let ly_ctx = &mut LayoutCtx::new(ly);
 
-        stack.layout_range_compositions(ly_ctx, &cfg.vertical_gate)?;
-        stack.layout_range_tables(ly_ctx, &cfg.vertical_gate)?;
+        let t0 = start_timer!(|| "layout");
 
-        stack.layout_first_degree_compositions(ly_ctx, &cfg.vanilla_gate)?;
-        stack.layout_second_degree_compositions(ly_ctx, &cfg.vanilla_gate)?;
+        cfg.stack.layout_range_limbs(ly_ctx, &cfg.vertical_gate)?;
+        cfg.stack.layout_range_single(ly_ctx, &cfg.vertical_gate)?;
+        cfg.stack.layout_range_tables(ly_ctx, &cfg.range_gate)?;
+        cfg.stack.layout_first_degree(ly_ctx, &cfg.vanilla_gate)?;
+        cfg.stack.layout_second_degree(ly_ctx, &cfg.vanilla_gate)?;
+        cfg.stack.layout_rom(ly_ctx, &cfg.rom_gate)?;
+        cfg.stack.apply_indirect_copy(ly_ctx)?;
 
-        stack.layout_rom(ly_ctx, &cfg.rom_gate)?;
-        // stack.layout_selections(ly_ctx, &cfg.select_gate)?;
-
-        stack.apply_indirect_copies(ly_ctx)?;
+        end_timer!(t0);
 
         Ok(())
+    }
+
+    fn params(&self) -> Self::Params {
+        self.params.clone()
     }
 }
 
 fn run_test<
     C: CurveAffine,
-    R: RangeInPlace<C::Scalar, 1>,
+    const RANGE_W: usize,
     const NUMBER_OF_LIMBS: usize,
     const LIMB_SIZE: usize,
-    const NUMBER_OF_SUBLIMBS: usize,
     const SUBLIMB_SIZE: usize,
 >(
     k: u32,
@@ -301,13 +292,12 @@ fn run_test<
 {
     // let aux_generator = Value::known(C::CurveExt::random(OsRng).into());
     let aux_generator = Value::known(C::CurveExt::generator().into());
-    let circuit =
-        TestCircuit::<C, R, NUMBER_OF_LIMBS, LIMB_SIZE, NUMBER_OF_SUBLIMBS, SUBLIMB_SIZE> {
-            aux_generator,
-            number_of_points,
-            window,
-            _marker: PhantomData,
-        };
+    let params = Params {
+        aux_generator,
+        number_of_points,
+        window,
+    };
+    let circuit = TestCircuit::<C, RANGE_W, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE> { params };
     // let public_inputs = vec![vec![]];
     let public_inputs = vec![];
     let prover =
@@ -332,12 +322,11 @@ fn test_msm() {
 
     run_test::<
         EqAffine,
-        RangeInPlaceGate<Fp, 1>,
+        2,
         3,  // number of limbs
         90, // limb size
-        5,  // number of sublimbs
         18, // sublimb size
-    >(20, 100, 6);
+    >(19, 100, 6);
 
     // run_test::<
     //     EqAffine,
@@ -350,20 +339,13 @@ fn test_msm() {
 }
 
 fn run_test_prover<
+    const RANGE_W: usize,
     const NUMBER_OF_LIMBS: usize,
     const LIMB_SIZE: usize,
-    const NUMBER_OF_SUBLIMBS: usize,
     const SUBLIMB_SIZE: usize,
 >(
     k: u32,
-    circuit: TestCircuit<
-        G1Affine,
-        RangeInPlaceGate<Fr, 1>,
-        NUMBER_OF_LIMBS,
-        LIMB_SIZE,
-        NUMBER_OF_SUBLIMBS,
-        SUBLIMB_SIZE,
-    >,
+    circuit: TestCircuit<G1Affine, RANGE_W, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE>,
 ) {
     println!("params read");
     let params = read_srs(k);
@@ -395,20 +377,19 @@ fn run_test_prover<
 fn bench_prover() {
     let aux_generator = Value::known(G1::random(OsRng).into());
 
-    let circuit =
-        TestCircuit::<G1Affine, RangeInPlaceGate<Fr, 1>, 3, 90, 5, 18> {
-            aux_generator,
-            number_of_points: 100,
-            window: 4,
-            _marker: PhantomData,
-        };
+    let params = Params {
+        aux_generator,
+        number_of_points: 100,
+        window: 6,
+    };
+    let circuit = TestCircuit::<G1Affine, 2, 3, 90, 18> { params };
 
     run_test_prover::<
+        2,
         3,  // number of limbs
         90, // limb size
-        5,  // number of sublimbs
         18, // sublimb size
-    >(20, circuit);
+    >(19, circuit);
 }
 
 fn write_srs(k: u32) -> ParamsKZG<Bn256> {

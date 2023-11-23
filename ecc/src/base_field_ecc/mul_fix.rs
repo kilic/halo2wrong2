@@ -14,9 +14,9 @@
 //         C: CurveAffine,
 //         const NUMBER_OF_LIMBS: usize,
 //         const LIMB_SIZE: usize,
-//         const NUMBER_OF_SUBLIMBS: usize,
+//         
 //         const SUBLIMB_SIZE: usize,
-//     > BaseFieldEccChip<C, NUMBER_OF_LIMBS, LIMB_SIZE, NUMBER_OF_SUBLIMBS, SUBLIMB_SIZE>
+//     > BaseFieldEccChip<C, NUMBER_OF_LIMBS, LIMB_SIZE,  SUBLIMB_SIZE>
 // {
 //     // pub fn mul_fix(
 //     //     &mut self,

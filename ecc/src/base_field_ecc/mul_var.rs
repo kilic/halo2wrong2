@@ -1,6 +1,7 @@
 use circuitry::{
     chip::{
-        first_degree::FirstDegreeChip, second_degree::SecondDegreeChip, select::SelectChip, ROMChip,
+        first_degree::FirstDegreeChip, range::RangeChip, second_degree::SecondDegreeChip,
+        select::SelectChip, ROMChip,
     },
     witness::{Composable, Witness},
 };
@@ -22,12 +23,14 @@ impl<
         C: CurveAffine,
         const NUMBER_OF_LIMBS: usize,
         const LIMB_SIZE: usize,
-        const NUMBER_OF_SUBLIMBS: usize,
         const SUBLIMB_SIZE: usize,
-    > BaseFieldEccChip<C, NUMBER_OF_LIMBS, LIMB_SIZE, NUMBER_OF_SUBLIMBS, SUBLIMB_SIZE>
+    > BaseFieldEccChip<C, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE>
 {
     pub fn msm_sliding_vertical<
-        Stack: SecondDegreeChip<C::Scalar> + FirstDegreeChip<C::Scalar> + SelectChip<C::Scalar>,
+        Stack: SecondDegreeChip<C::Scalar>
+            + FirstDegreeChip<C::Scalar>
+            + SelectChip<C::Scalar>
+            + RangeChip<C::Scalar>,
     >(
         &self,
         stack: &mut Stack,
@@ -78,7 +81,7 @@ impl<
             .iter()
             .map(|scalar| {
                 let (_scalar, mut bits) =
-                    stack.decompose_generic(scalar.value(), C::Scalar::NUM_BITS as usize, 1);
+                    stack.decompose(scalar.value(), C::Scalar::NUM_BITS as usize, 1);
                 stack.equal(&_scalar, scalar);
                 bits.reverse();
                 bits
@@ -95,8 +98,7 @@ impl<
                 chain.push(acc.deref().clone());
             }
 
-            for (_, (table, scalars)) in tables.iter().zip(scalars.chunks(window_size)).enumerate()
-            {
+            for (table, scalars) in tables.iter().zip(scalars.chunks(window_size)) {
                 assert_eq!(table.len(), 1 << scalars.len());
 
                 let selector = scalars
@@ -115,7 +117,8 @@ impl<
     pub fn msm_sliding_vertical_rom<
         Stack: SecondDegreeChip<C::Scalar>
             + FirstDegreeChip<C::Scalar>
-            + ROMChip<C::Scalar, NUMBER_OF_LIMBS>,
+            + ROMChip<C::Scalar, NUMBER_OF_LIMBS>
+            + RangeChip<C::Scalar>,
     >(
         &self,
         stack: &mut Stack,
@@ -177,7 +180,7 @@ impl<
             .iter()
             .map(|scalar| {
                 let (_scalar, mut bits) =
-                    stack.decompose_generic(scalar.value(), C::Scalar::NUM_BITS as usize, 1);
+                    stack.decompose(scalar.value(), C::Scalar::NUM_BITS as usize, 1);
                 stack.equal(&_scalar, scalar);
                 bits.reverse();
                 bits
@@ -221,7 +224,10 @@ impl<
     }
 
     pub fn msm_sliding_horizontal<
-        Stack: SecondDegreeChip<C::Scalar> + FirstDegreeChip<C::Scalar> + SelectChip<C::Scalar>,
+        Stack: SecondDegreeChip<C::Scalar>
+            + FirstDegreeChip<C::Scalar>
+            + SelectChip<C::Scalar>
+            + RangeChip<C::Scalar>,
     >(
         &self,
         stack: &mut Stack,
@@ -264,20 +270,21 @@ impl<
             correction = self.add_incomplete(stack, &correction, &aux_round_acc);
         }
 
-        let scalars = scalars
-            .iter()
-            .map(|scalar| {
-                let (_scalar, bits) =
-                    stack.decompose_generic(scalar.value(), C::Scalar::NUM_BITS as usize, 1);
+        let scalars =
+            scalars
+                .iter()
+                .map(|scalar| {
+                    let (_scalar, bits) =
+                        stack.decompose(scalar.value(), C::Scalar::NUM_BITS as usize, 1);
 
-                stack.equal(&_scalar, scalar);
+                    stack.equal(&_scalar, scalar);
 
-                bits.chunks(window_size)
-                    .rev()
-                    .map(|chunk| chunk.to_vec())
-                    .collect::<Vec<_>>()
-            })
-            .collect::<Vec<_>>();
+                    bits.chunks(window_size)
+                        .rev()
+                        .map(|chunk| chunk.to_vec())
+                        .collect::<Vec<_>>()
+                })
+                .collect::<Vec<_>>();
 
         let mut acc = None;
         for i in 0..number_of_rounds {
@@ -306,7 +313,8 @@ impl<
     pub fn msm_sliding_horizontal_rom<
         Stack: SecondDegreeChip<C::Scalar>
             + FirstDegreeChip<C::Scalar>
-            + ROMChip<C::Scalar, NUMBER_OF_LIMBS>,
+            + ROMChip<C::Scalar, NUMBER_OF_LIMBS>
+            + RangeChip<C::Scalar>,
     >(
         &self,
         stack: &mut Stack,
@@ -361,11 +369,8 @@ impl<
         let scalars = scalars
             .iter()
             .map(|scalar| {
-                let (_scalar, mut limbs) = stack.decompose_generic(
-                    scalar.value(),
-                    C::Scalar::NUM_BITS as usize,
-                    window_size,
-                );
+                let (_scalar, mut limbs) =
+                    stack.decompose(scalar.value(), C::Scalar::NUM_BITS as usize, window_size);
 
                 stack.equal(&_scalar, scalar);
 

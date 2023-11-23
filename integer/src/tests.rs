@@ -1,11 +1,7 @@
 use std::marker::PhantomData;
 
 use circuitry::{
-    gates::{
-        range::{in_place::RangeInPlaceGate, RangeInPlace},
-        vanilla::VanillaGate,
-        vertical::VerticalGate,
-    },
+    gates::{range::RangeGate, vanilla::VanillaGate, vertical::VerticalGate},
     stack::Stack,
     utils::{big_to_fe, modulus},
     LayoutCtx,
@@ -89,15 +85,13 @@ fn make_stack<
     N: PrimeField + Ord,
     const NUMBER_OF_LIMBS: usize,
     const LIMB_SIZE: usize,
-    const NUMBER_OF_SUBLIMBS: usize,
     const SUBLIMB_SIZE: usize,
 >(
     rns: &Rns<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
 ) -> Stack<N, 0> {
     let stack = &mut Stack::<N, 0>::default();
 
-    let ch: IntegerChip<W, N, NUMBER_OF_LIMBS, LIMB_SIZE, NUMBER_OF_SUBLIMBS, SUBLIMB_SIZE> =
-        IntegerChip::new(rns);
+    let ch: IntegerChip<W, N, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE> = IntegerChip::new(rns);
 
     {
         let zero = ch.rns.zero();
@@ -344,96 +338,73 @@ fn make_stack<
 
 #[derive(Clone)]
 struct TestConfig<
-    W: PrimeField,
     N: PrimeField + Ord,
-    R: RangeInPlace<N, 1>,
+    const RANGE_W: usize,
     const NUMBER_OF_LIMBS: usize,
     const LIMB_SIZE: usize,
-    const NUMBER_OF_SUBLIMBS: usize,
     const SUBLIMB_SIZE: usize,
 > {
-    vertical_gate: VerticalGate<N, R>,
-    vanilla_gate: VanillaGate<N>,
-    rns: Rns<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
+    vertical_gate: VerticalGate<RANGE_W>,
+    vanilla_gate: VanillaGate,
+    range_gate: RangeGate,
+    stack: Stack<N, 0>,
 }
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 struct TestCircuit<
     W: PrimeField,
     N: PrimeField + Ord,
-    R: RangeInPlace<N, 1>,
+    const RANGE_W: usize,
     const NUMBER_OF_LIMBS: usize,
     const LIMB_SIZE: usize,
-    const NUMBER_OF_SUBLIMBS: usize,
     const SUBLIMB_SIZE: usize,
-> {
-    _marker: PhantomData<(W, N, R)>,
-}
+>(PhantomData<(N, W)>);
 
 impl<
         W: PrimeField,
         N: PrimeField + Ord,
-        R: RangeInPlace<N, 1>,
+        const RANGE_W: usize,
         const NUMBER_OF_LIMBS: usize,
         const LIMB_SIZE: usize,
-        const NUMBER_OF_SUBLIMBS: usize,
         const SUBLIMB_SIZE: usize,
-    > Circuit<N>
-    for TestCircuit<W, N, R, NUMBER_OF_LIMBS, LIMB_SIZE, NUMBER_OF_SUBLIMBS, SUBLIMB_SIZE>
+    > Circuit<N> for TestCircuit<W, N, RANGE_W, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE>
 {
-    type Config = TestConfig<W, N, R, NUMBER_OF_LIMBS, LIMB_SIZE, NUMBER_OF_SUBLIMBS, SUBLIMB_SIZE>;
+    type Config = TestConfig<N, RANGE_W, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE>;
     type FloorPlanner = SimpleFloorPlanner;
+    type Params = ();
 
     fn configure(meta: &mut ConstraintSystem<N>) -> Self::Config {
         let rns = Rns::construct();
 
-        let advice = meta.advice_column();
-        let range_gate = R::configure(meta, [advice]);
-
-        let acc = meta.advice_column();
-        let scale = meta.fixed_column();
-
-        let mut vertical_gate = VerticalGate::new(meta, range_gate, scale, advice, acc);
-        vertical_gate.configure_composition_gate(meta);
-
-        let vanilla_gate = VanillaGate::new(meta);
-        vanilla_gate.configure(meta);
+        let advices = (0..RANGE_W)
+            .map(|_| meta.advice_column())
+            .collect::<Vec<_>>();
+        let range_gate = RangeGate::configure(meta, &advices);
+        let vertical_gate = VerticalGate::configure(meta, &range_gate, advices.try_into().unwrap());
+        let vanilla_gate = VanillaGate::configure(meta);
+        let stack = make_stack::<W, N, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE>(&rns);
 
         Self::Config {
-            rns,
+            stack,
+            range_gate,
             vertical_gate,
             vanilla_gate,
         }
     }
 
     fn without_witnesses(&self) -> Self {
-        Self {
-            _marker: PhantomData,
-        }
+        Self::default()
     }
 
-    fn synthesize(&self, cfg: Self::Config, ly: impl Layouter<N>) -> Result<(), Error> {
-        let mut stack = make_stack::<
-            W,
-            N,
-            NUMBER_OF_LIMBS,
-            LIMB_SIZE,
-            NUMBER_OF_SUBLIMBS,
-            SUBLIMB_SIZE,
-        >(&cfg.rns);
-
+    fn synthesize(&self, mut cfg: Self::Config, ly: impl Layouter<N>) -> Result<(), Error> {
         let ly_ctx = &mut LayoutCtx::new(ly);
-
-        stack.layout_first_degree_compositions(ly_ctx, &cfg.vertical_gate)?;
-
-        stack.layout_second_degree_compositions(ly_ctx, &cfg.vanilla_gate)?;
-
-        stack.layout_range_compositions(ly_ctx, &cfg.vanilla_gate)?;
-        stack.layout_range_tables(ly_ctx, &cfg.vertical_gate)?;
-
-        stack.layout_selections(ly_ctx, &cfg.vanilla_gate)?;
-
-        stack.apply_indirect_copies(ly_ctx)?;
+        cfg.stack.layout_first_degree(ly_ctx, &cfg.vanilla_gate)?;
+        cfg.stack.layout_second_degree(ly_ctx, &cfg.vanilla_gate)?;
+        cfg.stack.layout_selections(ly_ctx, &cfg.vanilla_gate)?;
+        cfg.stack.layout_range_limbs(ly_ctx, &cfg.vertical_gate)?;
+        cfg.stack.layout_range_single(ly_ctx, &cfg.vertical_gate)?;
+        cfg.stack.layout_range_tables(ly_ctx, &cfg.range_gate)?;
+        cfg.stack.apply_indirect_copy(ly_ctx)?;
 
         Ok(())
     }
@@ -442,19 +413,15 @@ impl<
 fn run_test<
     W: PrimeField,
     N: Ord + FromUniformBytes<64>,
-    R: RangeInPlace<N, 1>,
+    const RANGE_W: usize,
     const NUMBER_OF_LIMBS: usize,
     const LIMB_SIZE: usize,
-    const NUMBER_OF_SUBLIMBS: usize,
     const SUBLIMB_SIZE: usize,
 >(
     k: u32,
 ) {
     let circuit =
-        TestCircuit::<W, N, R, NUMBER_OF_LIMBS, LIMB_SIZE, NUMBER_OF_SUBLIMBS, SUBLIMB_SIZE> {
-            _marker: PhantomData,
-        };
-    // let public_inputs = vec![vec![]];
+        TestCircuit::<W, N, RANGE_W, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE>(PhantomData);
     let public_inputs = vec![];
     let prover =
         match MockProver::run(k, &circuit, public_inputs) {
@@ -471,10 +438,9 @@ fn test_integer() {
     run_test::<
         PastaFp,
         PastaFq,
-        RangeInPlaceGate<PastaFq, 1>,
+        2,  // range gate width
         3,  // number of limbs
         90, // limb size
-        5,  // number of sublimbs
-        18, // sublimb size
+        18, // sub limb size
     >(19);
 }

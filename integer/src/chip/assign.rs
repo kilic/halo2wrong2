@@ -1,6 +1,7 @@
 use crate::chip::IntegerChip;
 use crate::integer::{Integer, Range, UnassignedInteger};
 use circuitry::chip::first_degree::FirstDegreeChip;
+use circuitry::chip::range::RangeChip;
 use circuitry::{
     utils::{big_to_fe, big_to_fe_unsafe, decompose, fe_to_big},
     witness::{Scaled, Witness},
@@ -13,9 +14,8 @@ impl<
         N: PrimeField + Ord,
         const NUMBER_OF_LIMBS: usize,
         const LIMB_SIZE: usize,
-        const NUMBER_OF_SUBLIMBS: usize,
         const SUBLIMB_SIZE: usize,
-    > IntegerChip<W, N, NUMBER_OF_LIMBS, LIMB_SIZE, NUMBER_OF_SUBLIMBS, SUBLIMB_SIZE>
+    > IntegerChip<W, N, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE>
 {
     pub fn register_constant(
         &self,
@@ -25,12 +25,13 @@ impl<
         let big = fe_to_big(constant);
         let native: N = big_to_fe(&big);
 
-        let limbs: [N; NUMBER_OF_LIMBS] = decompose::<NUMBER_OF_LIMBS, LIMB_SIZE>(&big)
-            .iter()
-            .map(big_to_fe_unsafe)
-            .collect::<Vec<_>>()
-            .try_into()
-            .unwrap();
+        let limbs: [N; NUMBER_OF_LIMBS] =
+            decompose::<NUMBER_OF_LIMBS, LIMB_SIZE>(&big)
+                .iter()
+                .map(big_to_fe_unsafe)
+                .collect::<Vec<_>>()
+                .try_into()
+                .unwrap();
 
         let limbs = limbs
             .iter()
@@ -47,9 +48,9 @@ impl<
         )
     }
 
-    pub fn range(
+    pub fn range<Chip: RangeChip<N> + FirstDegreeChip<N>>(
         &self,
-        stack: &mut impl FirstDegreeChip<N>,
+        chip: &mut Chip,
         integer: UnassignedInteger<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
         range: Range,
     ) -> Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
@@ -62,11 +63,9 @@ impl<
             .enumerate()
             .map(|(i, limb)| {
                 if i == NUMBER_OF_LIMBS - 1 {
-                    stack
-                        .decompose_generic(*limb, last_limb_size, SUBLIMB_SIZE)
-                        .0
+                    chip.decompose(*limb, last_limb_size, SUBLIMB_SIZE).0
                 } else {
-                    stack.decompose::<NUMBER_OF_SUBLIMBS, SUBLIMB_SIZE>(*limb).0
+                    chip.decompose(*limb, LIMB_SIZE, SUBLIMB_SIZE).0
                 }
             })
             .collect::<Vec<_>>();
@@ -77,11 +76,11 @@ impl<
             .map(|(limb, base)| Scaled::new(limb, *base))
             .collect::<Vec<Scaled<N>>>();
 
-        let native = stack.compose(&terms[..], N::ZERO);
+        let native = chip.compose(&terms[..], N::ZERO);
 
         Integer::new(
             &limbs.try_into().unwrap(),
-            &max_values.try_into().unwrap(),
+            &max_values,
             integer.big(),
             native,
         )

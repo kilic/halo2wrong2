@@ -109,7 +109,7 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const LIMB_SIZE
             let t = result
                 .clone()
                 .into_iter()
-                .zip(to_sub.into_iter())
+                .zip(to_sub)
                 .enumerate()
                 .map(|(i, (result, to_sub))| {
                     let t = w0
@@ -133,7 +133,7 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const LIMB_SIZE
             let mut prev: Option<Expression<N>> = None;
             let carry_gates = t
                 .into_iter()
-                .zip(carry.into_iter())
+                .zip(carry)
                 .enumerate()
                 .map(|(_, (t, carry))| {
                     let expr = t - carry.clone() * base;
@@ -185,8 +185,8 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const LIMB_SIZE
             let t = result
                 .clone()
                 .into_iter()
-                .zip(w0.clone().into_iter())
-                .zip(negative_wrong_modulus_decomposed.into_iter())
+                .zip(w0.clone())
+                .zip(negative_wrong_modulus_decomposed)
                 .enumerate()
                 .map(|(_, ((result, w0), p))| w0 - result + quotient.clone() * p)
                 .collect::<Vec<_>>();
@@ -194,7 +194,7 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const LIMB_SIZE
             let mut prev: Option<Expression<N>> = None;
             let carry_gates = t
                 .into_iter()
-                .zip(carry.into_iter())
+                .zip(carry)
                 .enumerate()
                 .map(|(_, (t, carry))| {
                     let expr = t - carry.clone() * base;

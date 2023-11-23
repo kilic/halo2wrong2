@@ -1,5 +1,3 @@
-use std::marker::PhantomData;
-
 use ff::PrimeField;
 use halo2::{
     circuit::Layouter,
@@ -8,7 +6,6 @@ use halo2::{
 };
 
 use crate::{
-    enforcement::MemoryOperation,
     witness::{Composable, Witness},
     LayoutCtx, RegionCtx,
 };
@@ -16,7 +13,7 @@ use crate::{
 use super::GateLayout;
 
 #[derive(Clone, Debug)]
-pub struct ROMGate<F: PrimeField, const W: usize> {
+pub struct ROMGate<const W: usize> {
     pub(crate) query_selector: Selector,
     pub(crate) query_tag: Column<Fixed>,
     pub(crate) query_fraction: Column<Advice>,
@@ -26,12 +23,10 @@ pub struct ROMGate<F: PrimeField, const W: usize> {
     pub(crate) table_tag: Column<Fixed>,
     pub(crate) table_address: Column<Fixed>,
     pub(crate) table: [Column<Advice>; W],
-
-    pub(crate) _marker: PhantomData<F>,
 }
 
-impl<F: PrimeField + Ord, const W: usize> ROMGate<F, W> {
-    pub fn configure(
+impl<const W: usize> ROMGate<W> {
+    pub fn configure<F: PrimeField>(
         meta: &mut ConstraintSystem<F>,
         query_fraction: Column<Advice>,
         query: [Column<Advice>; W],
@@ -73,11 +68,8 @@ impl<F: PrimeField + Ord, const W: usize> ROMGate<F, W> {
 
             query
                 .into_iter()
-                .zip(table.into_iter())
-                .chain(std::iter::once((
-                    query_fraction + query_base,
-                    table_address,
-                )))
+                .zip(table)
+                .chain(std::iter::once((query_fraction + query_base, table_address)))
                 .chain(std::iter::once((query_tag, table_tag)))
                 .map(|(query, table)| (query_selector.clone() * query, table)) //
                 .collect::<Vec<_>>()
@@ -93,35 +85,33 @@ impl<F: PrimeField + Ord, const W: usize> ROMGate<F, W> {
             table_tag,
             table_address,
             table,
-
-            _marker: PhantomData,
         }
     }
 }
 
-impl<F: PrimeField + Ord, const W: usize> GateLayout<F, Vec<MemoryOperation<F, W>>>
-    for ROMGate<F, W>
+impl<F: PrimeField + Ord, const W: usize> GateLayout<F, Vec<crate::enforcement::ROM<F, W>>>
+    for ROMGate<W>
 {
+    type Output = ();
+
     fn layout<L: Layouter<F>>(
         &self,
         ly_ctx: &mut LayoutCtx<F, L>,
-        e: Vec<MemoryOperation<F, W>>,
+        e: Vec<crate::enforcement::ROM<F, W>>,
     ) -> Result<(), Error> {
         #[cfg(feature = "info")]
         {
             println!("---");
-            println!("ROM gate");
             let mut n_write = 0;
             let mut n_read = 0;
             for e in e.iter() {
                 match e {
-                    MemoryOperation::Write { .. } => n_write += 1,
-                    MemoryOperation::Read { .. } => n_read += 1,
+                    crate::enforcement::ROM::Write { .. } => n_write += 1,
+                    crate::enforcement::ROM::Read { .. } => n_read += 1,
                 }
             }
-            println!("* * n_write: {n_write}");
-            println!("* * n_read: {n_read}");
-            println!();
+            println!("* n_write: {n_write}");
+            println!("* n_read: {n_read}");
         }
 
         let _offset = ly_ctx.layouter.assign_region(
@@ -131,14 +121,14 @@ impl<F: PrimeField + Ord, const W: usize> GateLayout<F, Vec<MemoryOperation<F, W
 
                 for op in e.iter() {
                     match op {
-                        MemoryOperation::Write {
+                        crate::enforcement::ROM::Write {
                             tag,
                             address,
                             values,
                         } => {
                             self.write(ctx, *tag, *address, values)?;
                         }
-                        MemoryOperation::Read {
+                        crate::enforcement::ROM::Read {
                             tag,
                             address_base,
                             address_fraction,
@@ -153,12 +143,18 @@ impl<F: PrimeField + Ord, const W: usize> GateLayout<F, Vec<MemoryOperation<F, W
             },
         )?;
 
+        #[cfg(feature = "info")]
+        {
+            println!("* rows: {_offset}");
+            println!();
+        }
+
         Ok(())
     }
 }
 
-impl<F: PrimeField + Ord, const W: usize> ROMGate<F, W> {
-    fn read(
+impl<const W: usize> ROMGate<W> {
+    fn read<F: PrimeField>(
         &self,
         ctx: &mut RegionCtx<'_, '_, F>,
         tag: F,
@@ -201,7 +197,7 @@ impl<F: PrimeField + Ord, const W: usize> ROMGate<F, W> {
         Ok(())
     }
 
-    fn write(
+    fn write<F: PrimeField>(
         &self,
         ctx: &mut RegionCtx<'_, '_, F>,
         tag: F,
@@ -229,183 +225,5 @@ impl<F: PrimeField + Ord, const W: usize> ROMGate<F, W> {
         ctx.fixed(self.table_tag, tag)?;
         ctx.next();
         Ok(())
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use std::collections::BTreeMap;
-
-    use super::*;
-    use ff::FromUniformBytes;
-    use halo2::{
-        circuit::{SimpleFloorPlanner, Value},
-        dev::MockProver,
-        halo2curves::pasta::Fp,
-        plonk::Circuit,
-    };
-    use rand_core::OsRng;
-
-    macro_rules! v {
-        ($e:expr) => {
-            Value::known($e)
-        };
-    }
-
-    pub fn rand_value<F: PrimeField>() -> Value<F> {
-        let value = F::random(OsRng);
-        v!(value)
-    }
-
-    #[derive(Clone)]
-    struct TestConfig<F: PrimeField + Ord, const W: usize> {
-        rom_gate: ROMGate<F, W>,
-    }
-
-    struct TestCircuit<F: PrimeField + Ord, const W: usize> {
-        _marker: PhantomData<F>,
-    }
-
-    impl<F: PrimeField + Ord, const W: usize> Circuit<F> for TestCircuit<F, W> {
-        type Config = TestConfig<F, W>;
-        type FloorPlanner = SimpleFloorPlanner;
-
-        fn configure(meta: &mut ConstraintSystem<F>) -> Self::Config {
-            let values = (0..W).map(|_| meta.advice_column()).collect::<Vec<_>>();
-
-            let table_values = values.clone();
-            let query_values = values;
-            let query_fraction = meta.advice_column();
-            let rom_gate = ROMGate::configure(
-                meta,
-                query_fraction,
-                query_values.try_into().unwrap(),
-                table_values.try_into().unwrap(),
-            );
-
-            Self::Config { rom_gate }
-        }
-
-        fn without_witnesses(&self) -> Self {
-            Self {
-                _marker: PhantomData,
-            }
-        }
-
-        fn synthesize(&self, cfg: Self::Config, mut ly: impl Layouter<F>) -> Result<(), Error> {
-            let _offset = ly.assign_region(
-                || "",
-                |region| {
-                    let cell_map = &mut BTreeMap::new();
-                    let ctx = &mut crate::RegionCtx::new(region, cell_map);
-
-                    // lets fill some random values first
-                    for _ in 0..10 {
-                        let values = [rand_value::<F>(); W];
-                        for (value, column) in values.iter().zip(cfg.rom_gate.query.iter()) {
-                            let _new_cell = ctx.advice(*column, *value)?;
-                        }
-                        ctx.fixed(cfg.rom_gate.table_address, F::ZERO)?;
-                        ctx.fixed(cfg.rom_gate.table_tag, F::ZERO)?;
-                        ctx.fixed(cfg.rom_gate.query_base, F::ZERO)?;
-                        ctx.fixed(cfg.rom_gate.query_tag, F::ZERO)?;
-                        ctx.next();
-                    }
-
-                    let magic = F::from(333);
-
-                    let addresses = [101u64, 102, 103, 104];
-                    let addresses = addresses.into_iter().map(F::from).collect::<Vec<_>>();
-                    let table = addresses
-                        .iter()
-                        .map(|address| {
-                            let values = [rand_value::<F>(); W];
-                            for (value, column) in values.iter().zip(cfg.rom_gate.query.iter()) {
-                                let _new_cell = ctx.advice(*column, *value)?;
-                            }
-                            ctx.fixed(cfg.rom_gate.table_address, *address)?;
-                            ctx.fixed(cfg.rom_gate.table_tag, magic)?;
-                            ctx.fixed(cfg.rom_gate.query_base, F::ZERO)?;
-                            ctx.fixed(cfg.rom_gate.query_tag, F::ZERO)?;
-                            ctx.next();
-
-                            Ok(values)
-                        })
-                        .collect::<Result<Vec<_>, Error>>()?;
-
-                    for _ in 0..10 {
-                        let values = [rand_value::<F>(); W];
-                        for (value, column) in values.iter().zip(cfg.rom_gate.query.iter()) {
-                            let _new_cell = ctx.advice(*column, *value)?;
-                        }
-                        // ctx.advice(cfg.rom_gate.query_fraction, Value::known(F::ONE))?;
-                        ctx.advice(cfg.rom_gate.query_fraction, Value::known(F::ONE))?;
-                        ctx.fixed(cfg.rom_gate.table_address, F::ZERO)?;
-                        ctx.fixed(cfg.rom_gate.table_tag, F::ZERO)?;
-                        ctx.fixed(cfg.rom_gate.query_base, F::ZERO)?;
-                        ctx.fixed(cfg.rom_gate.query_tag, F::ZERO)?;
-                        // ctx.enable(cfg.rom_gate.query_selector)?;
-                        ctx.next();
-                    }
-
-                    // lets make a query
-
-                    let address = addresses[2];
-                    let values = table[2];
-
-                    for (value, column) in values.iter().zip(cfg.rom_gate.query.iter()) {
-                        let _new_cell = ctx.advice(*column, *value)?;
-                    }
-                    ctx.fixed(cfg.rom_gate.query_base, F::ZERO)?;
-
-                    ctx.advice(cfg.rom_gate.query_fraction, Value::known(address))?;
-                    ctx.fixed(cfg.rom_gate.query_tag, magic)?;
-
-                    ctx.fixed(cfg.rom_gate.table_address, F::from(103))?;
-                    ctx.fixed(cfg.rom_gate.table_tag, magic)?;
-
-                    ctx.enable(cfg.rom_gate.query_selector)?;
-                    ctx.next();
-
-                    // for op in e.iter() {
-                    //     match op {
-                    //         MemoryOperation::Write { address, values } => {
-                    //             self.write(ctx, *address, values)?;
-                    //         }
-                    //         MemoryOperation::Read {
-                    //             base,
-                    //             fraction,
-                    //             values,
-                    //         } => {
-                    //             self.read(ctx, *base, fraction, values)?;
-                    //         }
-                    //     }
-                    // }
-
-                    Ok(ctx.offset())
-                },
-            )?;
-
-            Ok(())
-        }
-    }
-
-    fn run_test_rom<F: Ord + FromUniformBytes<64>, const W: usize>() {
-        const K: u32 = 17;
-        let circuit = TestCircuit::<F, W> {
-            _marker: PhantomData::<F>,
-        };
-        let public_inputs: Vec<Vec<F>> = vec![];
-        let prover = match MockProver::run(K, &circuit, public_inputs) {
-            Ok(prover) => prover,
-            Err(e) => panic!("{e:#?}"),
-        };
-
-        prover.assert_satisfied();
-    }
-
-    #[test]
-    fn test_xxx() {
-        run_test_rom::<Fp, 1>();
     }
 }

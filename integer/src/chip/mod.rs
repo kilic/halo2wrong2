@@ -20,9 +20,8 @@ impl<
         N: PrimeField + Ord,
         const NUMBER_OF_LIMBS: usize,
         const LIMB_SIZE: usize,
-        const NUMBER_OF_SUBLIMBS: usize,
         const SUBLIMB_SIZE: usize,
-    > IntegerChip<W, N, NUMBER_OF_LIMBS, LIMB_SIZE, NUMBER_OF_SUBLIMBS, SUBLIMB_SIZE>
+    > IntegerChip<W, N, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE>
 {
     pub(crate) fn is_gt_max_operand(&self, a: &Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>) -> bool {
         a.max() > self.rns.max_operand
@@ -40,8 +39,8 @@ use std::collections::BTreeMap;
 
 use circuitry::{
     chip::{
-        first_degree::FirstDegreeChip, second_degree::SecondDegreeChip, select::SelectChip, Core,
-        ROMChip,
+        first_degree::FirstDegreeChip, range::RangeChip, second_degree::SecondDegreeChip,
+        select::SelectChip, Core, ROMChip,
     },
     utils::{big_to_fe, big_to_fe_unsafe, compose, compose_into, decompose, fe_to_big, modulus},
     witness::{Composable, Scaled, Witness},
@@ -53,7 +52,6 @@ pub struct IntegerChip<
     N: PrimeField + Ord,
     const NUMBER_OF_LIMBS: usize,
     const LIMB_SIZE: usize,
-    const NUMBER_OF_SUBLIMBS: usize,
     const SUBLIMB_SIZE: usize,
 > {
     pub(crate) rns: Rns<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
@@ -108,19 +106,14 @@ fn calculate_base_sub_aux<
         assert!(base_aux_value > rns.max_remainder);
         // Assert limbs are above max values
         for (aux_limb, rem_limb) in aux.iter().zip(rns.max_remainder_limbs.iter()) {
-            assert!(aux_limb >= &rem_limb);
+            assert!(aux_limb >= rem_limb);
         }
     }
 
     aux
 }
 
-fn shift_sub_aux<
-    W: PrimeField,
-    N: PrimeField,
-    const NUMBER_OF_LIMBS: usize,
-    const LIMB_SIZE: usize,
->(
+fn shift_sub_aux<N: PrimeField, const NUMBER_OF_LIMBS: usize, const LIMB_SIZE: usize>(
     base_sub_aux: &[BigUint; NUMBER_OF_LIMBS],
     shift: usize,
 ) -> ([N; NUMBER_OF_LIMBS], [BigUint; NUMBER_OF_LIMBS], N) {
@@ -130,12 +123,13 @@ fn shift_sub_aux<
         .collect::<Vec<_>>()
         .try_into()
         .unwrap();
-    let aux = aux_big
-        .iter()
-        .map(|e| big_to_fe(e))
-        .collect::<Vec<N>>()
-        .try_into()
-        .unwrap();
+    let aux =
+        aux_big
+            .iter()
+            .map(|e| big_to_fe(e))
+            .collect::<Vec<N>>()
+            .try_into()
+            .unwrap();
     let native = compose_into::<N, N, NUMBER_OF_LIMBS, LIMB_SIZE>(&aux);
     (aux, aux_big, native)
 }
@@ -145,9 +139,8 @@ impl<
         N: PrimeField + Ord,
         const NUMBER_OF_LIMBS: usize,
         const LIMB_SIZE: usize,
-        const NUMBER_OF_SUBLIMBS: usize,
         const SUBLIMB_SIZE: usize,
-    > IntegerChip<W, N, NUMBER_OF_LIMBS, LIMB_SIZE, NUMBER_OF_SUBLIMBS, SUBLIMB_SIZE>
+    > IntegerChip<W, N, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE>
 {
     pub fn rns(&self) -> &Rns<W, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
         &self.rns
@@ -173,7 +166,7 @@ impl<
             Some(aux) => aux.clone(),
             None => {
                 println!("requied to calculate new sub aux at {max_shift}");
-                shift_sub_aux::<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>(&self.base_sub_aux, max_shift)
+                shift_sub_aux::<N, NUMBER_OF_LIMBS, LIMB_SIZE>(&self.base_sub_aux, max_shift)
             }
         }
     }
@@ -184,7 +177,7 @@ impl<
             .map(|shift| {
                 (
                     shift,
-                    shift_sub_aux::<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>(&base_sub_aux, shift),
+                    shift_sub_aux::<N, NUMBER_OF_LIMBS, LIMB_SIZE>(&base_sub_aux, shift),
                 )
             })
             .collect::<BTreeMap<_, _>>();
@@ -202,9 +195,8 @@ impl<
         N: PrimeField + Ord,
         const NUMBER_OF_LIMBS: usize,
         const LIMB_SIZE: usize,
-        const NUMBER_OF_SUBLIMBS: usize,
         const SUBLIMB_SIZE: usize,
-    > IntegerChip<W, N, NUMBER_OF_LIMBS, LIMB_SIZE, NUMBER_OF_SUBLIMBS, SUBLIMB_SIZE>
+    > IntegerChip<W, N, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE>
 {
     pub fn assign(
         &self,
@@ -246,7 +238,7 @@ impl<
         });
     }
 
-    pub fn normal_equal<Stack: SecondDegreeChip<N> + FirstDegreeChip<N>>(
+    pub fn normal_equal<Stack: SecondDegreeChip<N> + FirstDegreeChip<N> + RangeChip<N>>(
         &self,
         stack: &mut Stack,
         w0: &Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
@@ -256,7 +248,7 @@ impl<
         self.assert_zero(stack, must_be_zero)
     }
 
-    pub fn assert_not_equal<Stack: SecondDegreeChip<N> + FirstDegreeChip<N>>(
+    pub fn assert_not_equal<Stack: SecondDegreeChip<N> + FirstDegreeChip<N> + RangeChip<N>>(
         &self,
         stack: &mut Stack,
         w0: &Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
