@@ -3,4 +3,5 @@ members = [
   "circuitry",
   "integer",
   "ecc",
+  "transcript",
 ]
