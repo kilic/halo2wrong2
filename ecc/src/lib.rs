@@ -59,17 +59,17 @@ pub struct ConstantPoint<
     W: PrimeField,
     N: PrimeField,
     const NUMBER_OF_LIMBS: usize,
-    const BIT_LEN_LIMB: usize,
+    const LIMB_SIZE: usize,
 > {
-    x: ConstantInteger<W, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>,
-    y: ConstantInteger<W, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>,
+    x: ConstantInteger<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
+    y: ConstantInteger<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
 }
-impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const BIT_LEN_LIMB: usize>
-    ConstantPoint<W, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>
+impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const LIMB_SIZE: usize>
+    ConstantPoint<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>
 {
     pub fn new<Emulated: CurveAffine>(
         point: Emulated,
-    ) -> ConstantPoint<Emulated::Base, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB> {
+    ) -> ConstantPoint<Emulated::Base, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
         let coords = point.coordinates();
         // disallow point of infinity
         // it will not pass assing point enforcement
@@ -82,11 +82,11 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const BIT_LEN_L
         }
     }
 
-    pub fn x(&self) -> &ConstantInteger<W, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB> {
+    pub fn x(&self) -> &ConstantInteger<W, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
         &self.x
     }
 
-    pub fn y(&self) -> &ConstantInteger<W, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB> {
+    pub fn y(&self) -> &ConstantInteger<W, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
         &self.y
     }
 

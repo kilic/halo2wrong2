@@ -17,6 +17,7 @@ use crate::Point;
 
 pub mod mul_var;
 
+#[derive(Debug, Clone)]
 pub struct BaseFieldEccChip<
     C: CurveAffine,
     const NUMBER_OF_LIMBS: usize,
@@ -83,18 +84,17 @@ impl<
         stack: &mut Stack,
         point: Value<C>,
     ) -> Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE> {
-        let (x, y) =
-            point
-                .map(|point| {
-                    let coords = point.coordinates();
-                    // disallow point of infinity
-                    // it will not pass assing point enforcement
-                    let coords = coords.unwrap();
-                    let x = coords.x();
-                    let y = coords.y();
-                    (*x, *y)
-                })
-                .unzip();
+        let (x, y) = point
+            .map(|point| {
+                let coords = point.coordinates();
+                // disallow point of infinity
+                // it will not pass assing point enforcement
+                let coords = coords.unwrap();
+                let x = coords.x();
+                let y = coords.y();
+                (*x, *y)
+            })
+            .unzip();
 
         let x = &self
             .ch
@@ -414,13 +414,12 @@ impl<
         let t = &self.ch.add(stack, &p0.x, &p1.x);
         let t = &self.ch.neg(stack, t);
         let x_cur = self.ch.square(stack, &lambda, &[&t]);
-        let mut state =
-            State {
-                x_prev: p0.x.clone(),
-                y_prev: p0.y.clone(),
-                x_cur,
-                lambda,
-            };
+        let mut state = State {
+            x_prev: p0.x.clone(),
+            y_prev: p0.y.clone(),
+            x_cur,
+            lambda,
+        };
 
         for point in points.iter().skip(2) {
             let t = &self.ch.sub(stack, &state.x_cur, &state.x_prev);
