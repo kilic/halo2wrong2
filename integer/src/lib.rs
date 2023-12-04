@@ -1,5 +1,4 @@
 pub mod chip;
-pub mod gate;
 pub mod integer;
 
 pub mod rns;

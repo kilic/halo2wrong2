@@ -25,13 +25,12 @@ impl<
         let big = fe_to_big(constant);
         let native: N = big_to_fe(&big);
 
-        let limbs: [N; NUMBER_OF_LIMBS] =
-            decompose::<NUMBER_OF_LIMBS, LIMB_SIZE>(&big)
-                .iter()
-                .map(big_to_fe_unsafe)
-                .collect::<Vec<_>>()
-                .try_into()
-                .unwrap();
+        let limbs: [N; NUMBER_OF_LIMBS] = decompose::<NUMBER_OF_LIMBS, LIMB_SIZE>(&big)
+            .iter()
+            .map(big_to_fe_unsafe)
+            .collect::<Vec<_>>()
+            .try_into()
+            .unwrap();
 
         let limbs = limbs
             .iter()

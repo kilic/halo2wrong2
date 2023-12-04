@@ -24,6 +24,14 @@ pub trait FirstDegreeChip<F: PrimeField + Ord>:
         u
     }
 
+    fn add_add_constant(&mut self, w0: &Witness<F>, w1: &Witness<F>, constant: F) -> Witness<F> {
+        let u = self.new_witness(w0.value() + w1.value());
+        let u = u.value().map(|u| u + constant);
+        let u = self.new_witness(u);
+        self.zero_sum(&[w0.add(), w1.add(), u.sub()], constant);
+        u
+    }
+
     fn add_constant(&mut self, w0: &Witness<F>, constant: F) -> Witness<F> {
         let u = w0.value().map(|w0| w0 + constant);
         let u = self.new_witness(u);

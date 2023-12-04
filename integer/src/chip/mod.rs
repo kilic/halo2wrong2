@@ -2,7 +2,7 @@ use crate::integer::Integer;
 use ff::PrimeField;
 use halo2::circuit::Value;
 use num_bigint::BigUint;
-use num_traits::Zero;
+use num_traits::{One, Zero};
 
 use crate::{
     integer::{Range, UnassignedInteger},
@@ -46,7 +46,7 @@ use circuitry::{
     witness::{Composable, Scaled, Witness},
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct IntegerChip<
     W: PrimeField,
     N: PrimeField + Ord,
@@ -123,13 +123,12 @@ fn shift_sub_aux<N: PrimeField, const NUMBER_OF_LIMBS: usize, const LIMB_SIZE: u
         .collect::<Vec<_>>()
         .try_into()
         .unwrap();
-    let aux =
-        aux_big
-            .iter()
-            .map(|e| big_to_fe(e))
-            .collect::<Vec<N>>()
-            .try_into()
-            .unwrap();
+    let aux = aux_big
+        .iter()
+        .map(|e| big_to_fe(e))
+        .collect::<Vec<N>>()
+        .try_into()
+        .unwrap();
     let native = compose_into::<N, N, NUMBER_OF_LIMBS, LIMB_SIZE>(&aux);
     (aux, aux_big, native)
 }
@@ -198,6 +197,108 @@ impl<
         const SUBLIMB_SIZE: usize,
     > IntegerChip<W, N, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE>
 {
+    pub fn sign<S: FirstDegreeChip<N> + SecondDegreeChip<N> + RangeChip<N>>(
+        &self,
+        stack: &mut S,
+        w: &Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
+    ) -> Witness<N> {
+        self.assert_in_field(stack, w);
+        let limb0 = w.limb_at(0);
+        let (sign, half) = limb0
+            .value()
+            .map(|value| {
+                let value = &fe_to_big(&value);
+                let half = big_to_fe::<N>(&(value >> 1usize));
+                let sign: N = ((value & BigUint::one() != BigUint::zero()) as u64).into();
+                (sign, half)
+            })
+            .unzip();
+        let sign = stack.assign_bit(sign);
+        let half = stack.new_witness(half);
+        let terms = [half * N::from(2), sign.add(), limb0.sub()];
+        stack.zero_sum(&terms[..], N::ZERO);
+        sign
+    }
+
+    pub fn assert_in_field<S: FirstDegreeChip<N> + SecondDegreeChip<N> + RangeChip<N>>(
+        &self,
+        stack: &mut S,
+        w: &Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
+    ) {
+        let mut borrows = vec![];
+        let mut prev_borrow = BigUint::zero();
+        let result: Vec<_> = w
+            .limbs()
+            .iter()
+            .zip(self.rns.big_wrong_limbs.iter())
+            .enumerate()
+            .map(|(i, (w, modulus_limb))| {
+                let is_last = i == (NUMBER_OF_LIMBS - 1);
+                let modulus_limb = if is_last {
+                    modulus_limb - 1usize
+                } else {
+                    modulus_limb.clone()
+                };
+                let w = w.big();
+                let (limb, borrow) = w
+                    .map(|w| {
+                        //
+                        let cur_borrow = if modulus_limb < &w + &prev_borrow {
+                            BigUint::one()
+                        } else {
+                            BigUint::zero()
+                        };
+                        let limb =
+                            ((modulus_limb + (&cur_borrow << LIMB_SIZE)) - &prev_borrow) - &w;
+                        prev_borrow = cur_borrow;
+
+                        (big_to_fe::<N>(&limb), big_to_fe::<N>(&prev_borrow))
+                    })
+                    .unzip();
+
+                if !is_last {
+                    borrows.push(stack.assign_bit(borrow));
+                }
+
+                limb
+            })
+            .collect();
+
+        let lsh = self.rns.left_shifters[1];
+        let result: Value<Vec<N>> = Value::from_iter(result);
+        let result = result.map(|limbs| limbs.try_into().unwrap());
+        let result = UnassignedInteger::from_limbs(result);
+        let result = self.range(stack, result, Range::Remainder);
+
+        // first
+        let terms = [
+            w.limb_at(0).sub(),
+            result.limb_at(0).sub(),
+            borrows[0] * lsh,
+        ];
+        stack.zero_sum(&terms[..], self.rns.wrong_limbs[0]);
+        // intermediate
+        for i in 1..NUMBER_OF_LIMBS - 1 {
+            let terms = [
+                w.limb_at(i).sub(),
+                result.limb_at(i).sub(),
+                borrows[i] * lsh,
+                borrows[i - 1].sub(),
+            ];
+            stack.zero_sum(&terms[..], self.rns.wrong_limbs[i]);
+        }
+        // last
+        let terms = [
+            w.limb_at(NUMBER_OF_LIMBS - 1).sub(),
+            result.limb_at(NUMBER_OF_LIMBS - 1).sub(),
+            borrows[NUMBER_OF_LIMBS - 2].sub(),
+        ];
+        stack.zero_sum(
+            &terms[..],
+            self.rns.wrong_limbs[NUMBER_OF_LIMBS - 1] - N::ONE,
+        );
+    }
+
     pub fn assign(
         &self,
         stack: &mut impl FirstDegreeChip<N>,

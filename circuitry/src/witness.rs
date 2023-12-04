@@ -2,6 +2,7 @@ use std::fmt::Debug;
 
 use crate::halo2::circuit::Value;
 use ff::PrimeField;
+use num_bigint::BigUint;
 
 use crate::utils::{decompose_into, decompose_into_dyn, fe_to_big};
 
@@ -162,6 +163,10 @@ impl<F: PrimeField> Witness<F> {
             value,
             // range: None,
         }
+    }
+
+    pub fn big(&self) -> Value<BigUint> {
+        self.value().map(|value| fe_to_big(&value))
     }
 
     pub fn id(&self) -> Option<u32> {

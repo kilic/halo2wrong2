@@ -76,7 +76,9 @@ pub(crate) fn layout_range_tables<F: PrimeField, L: Layouter<F>>(
 ) -> Result<(), Error> {
     let mut bit_sizes = bit_sizes.to_vec();
     bit_sizes.sort();
-    assert!(!bit_sizes.is_empty());
+    if bit_sizes.is_empty() {
+        return Ok(());
+    }
     assert_ne!(bit_sizes[0], 0);
     ly_ctx.layouter.assign_table(
         || "",

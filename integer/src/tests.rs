@@ -57,13 +57,12 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const LIMB_SIZE
         &self,
         bit_len: usize,
     ) -> UnassignedInteger<W, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
-        let limbs =
-            (0..NUMBER_OF_LIMBS)
-                .map(|_| {
-                    let e = &OsRng.gen_biguint(bit_len as u64);
-                    big_to_fe(e)
-                })
-                .collect::<Vec<N>>();
+        let limbs = (0..NUMBER_OF_LIMBS)
+            .map(|_| {
+                let e = &OsRng.gen_biguint(bit_len as u64);
+                big_to_fe(e)
+            })
+            .collect::<Vec<N>>();
         UnassignedInteger::from_limbs(Value::known(limbs.try_into().unwrap()))
     }
 
@@ -104,6 +103,12 @@ fn make_stack<
 
     // reduce & assert
     {
+        for _ in 0..100 {
+            let a0 = ch.rns.rand_in_field();
+            let a0 = ch.range(stack, a0, Range::Remainder);
+            ch.assert_in_field(stack, &a0);
+        }
+
         let a0 = ch.rns.rand_in_field();
         let a1 = ch.rns.rand_in_field();
         let a1 = ch.assign(stack, a1, Range::Remainder);
@@ -423,11 +428,10 @@ fn run_test<
     let circuit =
         TestCircuit::<W, N, RANGE_W, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE>(PhantomData);
     let public_inputs = vec![];
-    let prover =
-        match MockProver::run(k, &circuit, public_inputs) {
-            Ok(prover) => prover,
-            Err(e) => panic!("{e:#}"),
-        };
+    let prover = match MockProver::run(k, &circuit, public_inputs) {
+        Ok(prover) => prover,
+        Err(e) => panic!("{e:#}"),
+    };
     prover.assert_satisfied();
 }
 

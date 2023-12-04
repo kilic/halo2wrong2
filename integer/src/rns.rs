@@ -21,6 +21,8 @@ pub struct Rns<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const
     pub(super) big_neg_wrong_limbs_in_binary: [BigUint; NUMBER_OF_LIMBS],
     pub(super) neg_wrong_limbs_in_binary: [N; NUMBER_OF_LIMBS],
     pub(super) wrong_limbs: [N; NUMBER_OF_LIMBS],
+    pub(super) big_wrong_limbs: [BigUint; NUMBER_OF_LIMBS],
+
     pub(super) wrong_in_native: N,
 
     pub(super) _max_limb: BigUint,
@@ -176,6 +178,8 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const LIMB_SIZE
             .collect::<Vec<N>>()
             .try_into()
             .unwrap();
+        // `w-1 = [w_0-1 , w_1, ... ] `
+
         let wrong_in_native: N = big_to_fe(&(wrong_modulus % native_modulus));
 
         // Calculate shifter elements
@@ -202,6 +206,7 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const LIMB_SIZE
             neg_wrong_limbs_in_binary,
             big_neg_wrong_limbs_in_binary,
             wrong_limbs,
+            big_wrong_limbs,
             wrong_in_native,
             max_remainder: max_remainder.clone(),
             max_operand: max_operand.clone(),
@@ -227,13 +232,11 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const LIMB_SIZE
         match range {
             Range::Remainder => self.max_remainder_limbs.clone(),
             Range::Operand => self.max_operand_limbs.clone(),
-            Range::Unreduced => {
-                std::iter::repeat_with(|| self._max_unreduced_limb.clone())
-                    .take(NUMBER_OF_LIMBS)
-                    .collect::<Vec<_>>()
-                    .try_into()
-                    .unwrap()
-            }
+            Range::Unreduced => std::iter::repeat_with(|| self._max_unreduced_limb.clone())
+                .take(NUMBER_OF_LIMBS)
+                .collect::<Vec<_>>()
+                .try_into()
+                .unwrap(),
             Range::MulQuotient => self.max_quotient_limbs.clone(),
         }
     }
@@ -351,20 +354,19 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const LIMB_SIZE
         let k = numer_max / &self.wrong_modulus;
         let shifter = k * &self.wrong_modulus;
 
-        let (result, quotient) =
-            numer
-                .big()
-                .zip(denom.big())
-                .map(|(numer, denom)| {
-                    let denom_inv = invert::<W>(&denom);
-                    let result = (&denom_inv * &numer) % &self.wrong_modulus;
-                    let (quotient, _must_be_zero) =
-                        (&denom * &result + &shifter - &numer).div_rem(&self.wrong_modulus);
-                    assert_eq!(_must_be_zero, BigUint::zero());
+        let (result, quotient) = numer
+            .big()
+            .zip(denom.big())
+            .map(|(numer, denom)| {
+                let denom_inv = invert::<W>(&denom);
+                let result = (&denom_inv * &numer) % &self.wrong_modulus;
+                let (quotient, _must_be_zero) =
+                    (&denom * &result + &shifter - &numer).div_rem(&self.wrong_modulus);
+                assert_eq!(_must_be_zero, BigUint::zero());
 
-                    (result, quotient)
-                })
-                .unzip();
+                (result, quotient)
+            })
+            .unzip();
 
         #[cfg(feature = "synth-sanity")]
         {

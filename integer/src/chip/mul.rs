@@ -127,7 +127,9 @@ impl<
             .iter()
             .map(|to_add| to_add.native().add().into())
             .chain(std::iter::once((w0.native() * w0.native()).into()))
-            .chain(std::iter::once((quotient.native() * -self.rns.wrong_in_native).into()))
+            .chain(std::iter::once(
+                (quotient.native() * -self.rns.wrong_in_native).into(),
+            ))
             .chain(std::iter::once(result.native().sub().into()))
             .collect();
 
@@ -234,7 +236,9 @@ impl<
             .iter()
             .map(|to_add| to_add.native().add().into())
             .chain(std::iter::once((w0.native() * w1.native()).into()))
-            .chain(std::iter::once((quotient.native() * -self.rns.wrong_in_native).into()))
+            .chain(std::iter::once(
+                (quotient.native() * -self.rns.wrong_in_native).into(),
+            ))
             .chain(std::iter::once(result.native().sub().into()))
             .collect();
 
@@ -435,7 +439,9 @@ impl<
             .iter()
             .map(|to_add| to_add.native().add().into())
             .chain(std::iter::once((w0.native() * w1.native()).into()))
-            .chain(std::iter::once((quotient.native() * -self.rns.wrong_in_native).into()))
+            .chain(std::iter::once(
+                (quotient.native() * -self.rns.wrong_in_native).into(),
+            ))
             .chain(std::iter::once((divisor.native() * result.native()).into()))
             .collect();
 

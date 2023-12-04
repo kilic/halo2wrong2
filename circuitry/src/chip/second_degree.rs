@@ -1,11 +1,18 @@
 use crate::witness::{Composable, Term, Witness};
 use ff::PrimeField;
+use halo2::circuit::Value;
 
 use super::Chip;
 
 pub trait SecondDegreeChip<F: PrimeField + Ord>:
     Chip<crate::enforcement::SecondDegree<F>, F>
 {
+    fn assign_bit(&mut self, w0: Value<F>) -> Witness<F> {
+        let w0 = self.new_witness(w0);
+        self.assert_bit(&w0);
+        w0
+    }
+
     fn assert_bit(&mut self, w0: &Witness<F>) {
         self.zero_sum_second_degree(&[(w0 * w0).into(), w0.sub().into()], F::ZERO);
     }
@@ -27,6 +34,10 @@ pub trait SecondDegreeChip<F: PrimeField + Ord>:
         let u = self.new_witness(u);
         self.zero_sum_second_degree(&[(w0 * w1).scale(factor).into(), u.sub().into()], constant);
         u
+    }
+
+    fn mul_add_constant(&mut self, w0: &Witness<F>, w1: &Witness<F>, constant: F) -> Witness<F> {
+        self.mul_add_constant_scaled(F::ONE, w0, w1, constant)
     }
 
     fn assert_not_zero(&mut self, w: &Witness<F>) {
