@@ -1,5 +1,6 @@
 use circuitry::{
     chip::{first_degree::FirstDegreeChip, second_degree::SecondDegreeChip},
+    stack::Stack,
     witness::{Scaled, Witness},
 };
 use halo2::halo2curves::ff::PrimeField;
@@ -73,11 +74,7 @@ impl<F: PrimeField, const T: usize, const RATE: usize> PoseidonChip<F, T, RATE> 
 
 impl<F: PrimeField + Ord, const T: usize, const RATE: usize> PoseidonChip<F, T, RATE> {
     /// Applies full state sbox then adds constants to each word in the state
-    fn sbox_full<S: FirstDegreeChip<F> + SecondDegreeChip<F>>(
-        &mut self,
-        stack: &mut S,
-        constants: &[F; T],
-    ) {
+    fn sbox_full(&mut self, stack: &mut Stack<F>, constants: &[F; T]) {
         for (word, constant) in self.state.iter_mut().zip(constants.iter()) {
             let t = stack.mul(word, word);
             let t = stack.mul(&t, &t);
@@ -87,11 +84,7 @@ impl<F: PrimeField + Ord, const T: usize, const RATE: usize> PoseidonChip<F, T, 
 
     /// Applies sbox to the first word then adds constants to each word in the
     /// state
-    fn sbox_part<S: FirstDegreeChip<F> + SecondDegreeChip<F>>(
-        &mut self,
-        stack: &mut S,
-        constant: F,
-    ) {
+    fn sbox_part(&mut self, stack: &mut Stack<F>, constant: F) {
         let word = &mut self.state[0];
         let t = stack.mul(word, word);
         let t = stack.mul(&t, &t);
@@ -99,9 +92,9 @@ impl<F: PrimeField + Ord, const T: usize, const RATE: usize> PoseidonChip<F, T, 
     }
 
     // Adds pre constants and chunked inputs to the state.
-    fn absorb_with_pre_constants<S: FirstDegreeChip<F> + SecondDegreeChip<F>>(
+    fn absorb_with_pre_constants(
         &mut self,
-        stack: &mut S,
+        stack: &mut Stack<F>,
         //
         // * inputs size equals to RATE: absorbing
         // * inputs size is less then RATE but not 0: padding
@@ -147,11 +140,7 @@ impl<F: PrimeField + Ord, const T: usize, const RATE: usize> PoseidonChip<F, T, 
     }
 
     /// Applies MDS State multiplication
-    fn apply_mds<S: FirstDegreeChip<F> + SecondDegreeChip<F>>(
-        &mut self,
-        stack: &mut S,
-        mds: &[[F; T]; T],
-    ) {
+    fn apply_mds(&mut self, stack: &mut Stack<F>, mds: &[[F; T]; T]) {
         // Calculate new state
         let new_state = mds
             .iter()
@@ -175,11 +164,7 @@ impl<F: PrimeField + Ord, const T: usize, const RATE: usize> PoseidonChip<F, T, 
     }
 
     /// Applies sparse MDS to the state
-    fn apply_sparse_mds<S: FirstDegreeChip<F> + SecondDegreeChip<F>>(
-        &mut self,
-        stack: &mut S,
-        mds: &SparseMDSMatrix<F, T, RATE>,
-    ) {
+    fn apply_sparse_mds(&mut self, stack: &mut Stack<F>, mds: &SparseMDSMatrix<F, T, RATE>) {
         // For the 0th word
         let terms = self
             .state
@@ -201,11 +186,7 @@ impl<F: PrimeField + Ord, const T: usize, const RATE: usize> PoseidonChip<F, T, 
     }
 
     /// Constrains poseidon permutation while mutating the given state
-    pub fn permutation<S: FirstDegreeChip<F> + SecondDegreeChip<F>>(
-        &mut self,
-        stack: &mut S,
-        inputs: Vec<Witness<F>>,
-    ) {
+    pub fn permutation(&mut self, stack: &mut Stack<F>, inputs: Vec<Witness<F>>) {
         let r_f = self.r_f_half();
         let mds = self.mds();
         let pre_sparse_mds = self.pre_sparse_mds();
@@ -238,10 +219,7 @@ impl<F: PrimeField + Ord, const T: usize, const RATE: usize> PoseidonChip<F, T, 
         self.apply_mds(stack, &mds);
     }
 
-    pub fn hash<S: FirstDegreeChip<F> + SecondDegreeChip<F>>(
-        &mut self,
-        stack: &mut S,
-    ) -> Witness<F> {
+    pub fn hash(&mut self, stack: &mut Stack<F>) -> Witness<F> {
         // Get elements to be hashed
         let input_elements = self.absorbing.clone();
         // Flush the input que

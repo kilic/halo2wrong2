@@ -15,6 +15,18 @@ mod assign;
 mod mul;
 mod reduce;
 
+use std::collections::BTreeMap;
+
+use circuitry::{
+    chip::{
+        first_degree::FirstDegreeChip, second_degree::SecondDegreeChip, select::SelectChip, Core,
+        ROMChip,
+    },
+    stack::Stack,
+    utils::{big_to_fe, big_to_fe_unsafe, compose, compose_into, decompose, fe_to_big, modulus},
+    witness::{Composable, Scaled, Witness},
+};
+
 impl<
         W: PrimeField,
         N: PrimeField + Ord,
@@ -34,17 +46,6 @@ impl<
         a.max() > self.rns.max_remainder
     }
 }
-
-use std::collections::BTreeMap;
-
-use circuitry::{
-    chip::{
-        first_degree::FirstDegreeChip, range::RangeChip, second_degree::SecondDegreeChip,
-        select::SelectChip, Core, ROMChip,
-    },
-    utils::{big_to_fe, big_to_fe_unsafe, compose, compose_into, decompose, fe_to_big, modulus},
-    witness::{Composable, Scaled, Witness},
-};
 
 #[derive(Debug, Clone)]
 pub struct IntegerChip<
@@ -197,9 +198,9 @@ impl<
         const SUBLIMB_SIZE: usize,
     > IntegerChip<W, N, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE>
 {
-    pub fn sign<S: FirstDegreeChip<N> + SecondDegreeChip<N> + RangeChip<N>>(
+    pub fn sign(
         &self,
-        stack: &mut S,
+        stack: &mut Stack<N>,
         w: &Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
     ) -> Witness<N> {
         self.assert_in_field(stack, w);
@@ -220,9 +221,9 @@ impl<
         sign
     }
 
-    pub fn assert_in_field<S: FirstDegreeChip<N> + SecondDegreeChip<N> + RangeChip<N>>(
+    pub fn assert_in_field(
         &self,
-        stack: &mut S,
+        stack: &mut Stack<N>,
         w: &Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
     ) {
         let mut borrows = vec![];
@@ -301,7 +302,7 @@ impl<
 
     pub fn assign(
         &self,
-        stack: &mut impl FirstDegreeChip<N>,
+        stack: &mut Stack<N>,
         integer: UnassignedInteger<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
         range: Range,
     ) -> Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
@@ -330,7 +331,7 @@ impl<
 
     pub fn copy_equal(
         &self,
-        stack: &mut impl Core<N>,
+        stack: &mut Stack<N>,
         w0: &Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
         w1: &Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
     ) {
@@ -339,9 +340,9 @@ impl<
         });
     }
 
-    pub fn normal_equal<Stack: SecondDegreeChip<N> + FirstDegreeChip<N> + RangeChip<N>>(
+    pub fn normal_equal(
         &self,
-        stack: &mut Stack,
+        stack: &mut Stack<N>,
         w0: &Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
         w1: &Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
     ) {
@@ -349,9 +350,9 @@ impl<
         self.assert_zero(stack, must_be_zero)
     }
 
-    pub fn assert_not_equal<Stack: SecondDegreeChip<N> + FirstDegreeChip<N> + RangeChip<N>>(
+    pub fn assert_not_equal(
         &self,
-        stack: &mut Stack,
+        stack: &mut Stack<N>,
         w0: &Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
         w1: &Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
     ) {
@@ -361,7 +362,7 @@ impl<
 
     pub fn select(
         &self,
-        stack: &mut impl SelectChip<N>,
+        stack: &mut Stack<N>,
         w0: &Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
         w1: &Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
         cond: &Witness<N>,
@@ -405,9 +406,9 @@ impl<
         Integer::new(&limbs, &max_vals, big, native)
     }
 
-    pub fn write<Stack: FirstDegreeChip<N> + ROMChip<N, NUMBER_OF_LIMBS>>(
+    pub fn write(
         &self,
-        stack: &mut Stack,
+        stack: &mut Stack<N>,
         tag: N,
         address: N,
         integer: &Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
@@ -416,9 +417,9 @@ impl<
         stack.write(tag, address, integer.limbs());
     }
 
-    pub fn read_recover<Stack: FirstDegreeChip<N> + ROMChip<N, NUMBER_OF_LIMBS>>(
+    pub fn read_recover(
         &self,
-        stack: &mut Stack,
+        stack: &mut Stack<N>,
         tag: N,
         address_base: N,
         address_fraction: &Witness<N>,
@@ -444,6 +445,6 @@ impl<
         // written value is asumed to be in remeinder range
         let max_values = self.rns.max_values(Range::Remainder);
 
-        Integer::new(&limbs, &max_values, big, native)
+        Integer::new(&limbs.try_into().unwrap(), &max_values, big, native)
     }
 }

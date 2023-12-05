@@ -16,40 +16,36 @@ use crate::{stack::Stack, LayoutCtx};
 
 use super::*;
 
-fn make_stack<F: PrimeField + Ord, const ROM_W: usize>() -> Stack<F, ROM_W> {
-    let mut stack: Stack<F, ROM_W> = Stack::default();
+fn make_stack<F: PrimeField + Ord>(rom_size: usize) -> Stack<F> {
+    let mut stack: Stack<F> = Stack::with_rom(rom_size);
 
     let tag = F::random(OsRng);
 
-    let w0 = (0..ROM_W)
+    let w0 = (0..rom_size)
         .map(|_| stack.assign_rand_witness())
         .collect::<Vec<_>>();
-    let w0: &[Witness<F>; ROM_W] = &w0.try_into().unwrap();
 
-    let w1 = (0..ROM_W)
+    let w1 = (0..rom_size)
         .map(|_| stack.assign_rand_witness())
         .collect::<Vec<_>>();
-    let w1 = &w1.try_into().unwrap();
 
-    let w2 = (0..ROM_W)
+    let w2 = (0..rom_size)
         .map(|_| stack.assign_rand_witness())
         .collect::<Vec<_>>();
-    let w2 = &w2.try_into().unwrap();
 
-    let w3 = (0..ROM_W)
+    let w3 = (0..rom_size)
         .map(|_| stack.assign_rand_witness())
         .collect::<Vec<_>>();
-    let w3 = &w3.try_into().unwrap();
 
     let a0 = F::from(0);
     let a1 = F::from(1);
     let a2 = F::from(2);
     let a3 = F::from(3);
 
-    stack.write(tag, a0, w0);
-    stack.write(tag, a1, w1);
-    stack.write(tag, a2, w2);
-    stack.write(tag, a3, w3);
+    stack.write(tag, a0, &w0);
+    stack.write(tag, a1, &w1);
+    stack.write(tag, a2, &w2);
+    stack.write(tag, a3, &w3);
 
     let f0 = &stack.assign(v!(F::from(0)));
     let f1 = &stack.assign(v!(F::from(1)));
@@ -91,8 +87,8 @@ fn make_stack<F: PrimeField + Ord, const ROM_W: usize>() -> Stack<F, ROM_W> {
 #[derive(Clone)]
 struct Config<F: PrimeField + Ord> {
     vanilla_gate: VanillaGate,
-    rom_gate: ROMGate<3>,
-    stack: Stack<F, 3>,
+    rom_gate: ROMGate,
+    stack: Stack<F>,
 }
 
 #[derive(Clone, Default)]
@@ -109,8 +105,8 @@ impl<F: PrimeField + Ord> Circuit<F> for TestCircuit<F> {
         let table_values = query_values;
         let query_fraction = meta.advice_column();
 
-        let rom_gate = ROMGate::configure(meta, query_fraction, query_values, table_values);
-        let stack = make_stack::<_, 3>();
+        let rom_gate = ROMGate::configure(meta, query_fraction, &query_values, &table_values);
+        let stack = make_stack::<_>(3);
 
         Self::Config {
             stack,

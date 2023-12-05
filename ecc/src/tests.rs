@@ -57,8 +57,8 @@ fn make_stack<
     aux_generator: Value<C>,
     window_size: usize,
     number_of_points: usize,
-) -> Stack<C::Scalar, NUMBER_OF_LIMBS> {
-    let stack = &mut Stack::<C::Scalar, NUMBER_OF_LIMBS>::default();
+) -> Stack<C::Scalar> {
+    let stack = &mut Stack::<C::Scalar>::with_rom(NUMBER_OF_LIMBS);
 
     let ch: BaseFieldEccChip<C, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE> =
         BaseFieldEccChip::new(rns, aux_generator);
@@ -169,8 +169,8 @@ struct TestConfig<
     vertical_gate: VerticalGate<RANGE_W>,
     vanilla_gate: VanillaGate,
     range_gate: RangeGate,
-    rom_gate: ROMGate<NUMBER_OF_LIMBS>,
-    stack: Stack<C::Scalar, NUMBER_OF_LIMBS>,
+    rom_gate: ROMGate,
+    stack: Stack<C::Scalar>,
 }
 
 #[derive(Default, Clone)]
@@ -220,19 +220,22 @@ impl<
             shared_columns[0..NUMBER_OF_LIMBS].try_into().unwrap();
         let query_fraction = vertical_gate.advice_columns()[0];
 
-        let rom_gate =
-            ROMGate::configure(meta, query_fraction, rom_value_columns, rom_value_columns);
+        let rom_gate = ROMGate::configure(
+            meta,
+            query_fraction,
+            &rom_value_columns[..],
+            &rom_value_columns[..],
+        );
 
         let rns = Rns::construct();
 
         let t0 = start_timer!(|| "witness gen");
-        let stack =
-            make_stack::<C, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE>(
-                &rns,
-                params.aux_generator,
-                params.window,
-                params.number_of_points,
-            );
+        let stack = make_stack::<C, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE>(
+            &rns,
+            params.aux_generator,
+            params.window,
+            params.number_of_points,
+        );
         end_timer!(t0);
 
         Self::Config {
@@ -300,11 +303,10 @@ fn run_test<
     let circuit = TestCircuit::<C, RANGE_W, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE> { params };
     // let public_inputs = vec![vec![]];
     let public_inputs = vec![];
-    let prover =
-        match MockProver::run(k, &circuit, public_inputs) {
-            Ok(prover) => prover,
-            Err(e) => panic!("{e:#}"),
-        };
+    let prover = match MockProver::run(k, &circuit, public_inputs) {
+        Ok(prover) => prover,
+        Err(e) => panic!("{e:#}"),
+    };
     prover.assert_satisfied();
 }
 
@@ -358,15 +360,14 @@ fn run_test_prover<
     let mut transcript = Blake2bWrite::<_, _, Challenge255<_>>::init(vec![]);
 
     let t0 = start_timer!(|| "prover");
-    let proof =
-        create_proof::<KZGCommitmentScheme<Bn256>, ProverSHPLONK<Bn256>, _, _, _, _>(
-            &params,
-            &pk,
-            &[circuit],
-            &[&[]],
-            OsRng,
-            &mut transcript,
-        );
+    let proof = create_proof::<KZGCommitmentScheme<Bn256>, ProverSHPLONK<Bn256>, _, _, _, _>(
+        &params,
+        &pk,
+        &[circuit],
+        &[&[]],
+        OsRng,
+        &mut transcript,
+    );
     end_timer!(t0);
 
     proof.expect("proof generation should not fail");

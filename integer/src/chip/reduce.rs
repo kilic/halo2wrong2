@@ -1,6 +1,7 @@
 use circuitry::chip::first_degree::FirstDegreeChip;
 use circuitry::chip::range::RangeChip;
-use circuitry::chip::second_degree::SecondDegreeChip;
+use circuitry::chip::Core;
+use circuitry::stack::Stack;
 use circuitry::witness::{Composable, Scaled, Witness};
 use ff::PrimeField;
 use num_bigint::BigUint;
@@ -17,9 +18,9 @@ impl<
         const SUBLIMB_SIZE: usize,
     > IntegerChip<W, N, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE>
 {
-    pub fn reduce<Chip: SecondDegreeChip<N> + FirstDegreeChip<N> + RangeChip<N>>(
+    pub fn reduce(
         &self,
-        stack: &mut Chip,
+        stack: &mut Stack<N>,
         integer: &Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
     ) -> Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
         let (result, quotient) = self.rns.reduction_witness(integer);
@@ -86,9 +87,9 @@ impl<
         result
     }
 
-    pub fn assert_zero<Chip: SecondDegreeChip<N> + FirstDegreeChip<N> + RangeChip<N>>(
+    pub fn assert_zero(
         &self,
-        stack: &mut Chip,
+        stack: &mut Stack<N>,
         integer: &Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
     ) {
         let (_result, quotient) = self.rns.reduction_witness(integer);

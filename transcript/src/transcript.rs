@@ -1,7 +1,4 @@
-use circuitry::{
-    chip::{first_degree::FirstDegreeChip, range::RangeChip, second_degree::SecondDegreeChip},
-    witness::Witness,
-};
+use circuitry::{chip::first_degree::FirstDegreeChip, stack::Stack, witness::Witness};
 use ecc::Point;
 use halo2::{arithmetic::CurveAffine, halo2curves::ff::PrimeField, plonk::Error};
 use integer::chip::IntegerChip;
@@ -12,12 +9,11 @@ use crate::PoseidonChip;
 /// `PointRepresentation` will encode point with an implemented strategy
 pub trait PointRepresentation<C: CurveAffine, N: PrimeField + Ord>: Default {
     fn encode_assigned<
-        S: FirstDegreeChip<N> + SecondDegreeChip<N> + RangeChip<N>,
         const NUMBER_OF_LIMBS: usize,
         const LIMB_SIZE: usize,
         const SUBLIMB_SIZE: usize,
     >(
-        stack: &mut S,
+        stack: &mut Stack<N>,
         integer_chip: IntegerChip<C::Base, N, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE>,
         point: &Point<C::Base, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
     ) -> Vec<Witness<N>>;
@@ -29,12 +25,11 @@ pub struct LimbRepresentation;
 
 impl<C: CurveAffine, N: PrimeField + Ord> PointRepresentation<C, N> for LimbRepresentation {
     fn encode_assigned<
-        S: FirstDegreeChip<N> + SecondDegreeChip<N> + RangeChip<N>,
         const NUMBER_OF_LIMBS: usize,
         const LIMB_SIZE: usize,
         const SUBLIMB_SIZE: usize,
     >(
-        stack: &mut S,
+        stack: &mut Stack<N>,
         integer_chip: IntegerChip<C::Base, N, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE>,
         point: &Point<C::Base, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
     ) -> Vec<Witness<N>> {
@@ -51,12 +46,11 @@ pub struct NativeRepresentation;
 
 impl<C: CurveAffine, N: PrimeField + Ord> PointRepresentation<C, N> for NativeRepresentation {
     fn encode_assigned<
-        S: FirstDegreeChip<N> + SecondDegreeChip<N> + RangeChip<N>,
         const NUMBER_OF_LIMBS: usize,
         const LIMB_SIZE: usize,
         const SUBLIMB_SIZE: usize,
     >(
-        _stack: &mut S,
+        _stack: &mut Stack<N>,
         _integer_chip: IntegerChip<C::Base, N, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE>,
         point: &Point<C::Base, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
     ) -> Vec<Witness<N>> {
@@ -83,7 +77,6 @@ impl<N: PrimeField + Ord, const T: usize, const RATE: usize> TranscriptChip<N, T
 
     /// Write point to the transcript
     pub fn write_point<
-        S: FirstDegreeChip<N> + SecondDegreeChip<N> + RangeChip<N>,
         C: CurveAffine,
         E: PointRepresentation<C, N>,
         const NUMBER_OF_LIMBS: usize,
@@ -91,7 +84,7 @@ impl<N: PrimeField + Ord, const T: usize, const RATE: usize> TranscriptChip<N, T
         const SUBLIMB_SIZE: usize,
     >(
         &mut self,
-        stack: &mut S,
+        stack: &mut Stack<N>,
         integer_chip: IntegerChip<C::Base, N, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE>,
         point: &Point<C::Base, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
     ) -> Result<(), Error> {
@@ -101,10 +94,7 @@ impl<N: PrimeField + Ord, const T: usize, const RATE: usize> TranscriptChip<N, T
     }
 
     // Constrain squeezing new challenge
-    pub fn squeeze<S: FirstDegreeChip<N> + SecondDegreeChip<N>>(
-        &mut self,
-        stack: &mut S,
-    ) -> Witness<N> {
+    pub fn squeeze(&mut self, stack: &mut Stack<N>) -> Witness<N> {
         self.poseidon.hash(stack)
     }
 }
@@ -140,11 +130,11 @@ mod tests {
         const RATE: usize,
         const RF: usize,
         const RP: usize,
-    >() -> Stack<C::Scalar, 0>
+    >() -> Stack<C::Scalar>
     where
         C::Scalar: FromUniformBytes<64>,
     {
-        let stack = &mut Stack::<C::Scalar, 0>::default();
+        let stack = &mut Stack::<_>::default();
 
         let spec = Spec::<C::Scalar, T, RATE>::new(RF, RP);
 
@@ -186,7 +176,7 @@ mod tests {
         vertical_gate: VerticalGate<1>,
         vanilla_gate: VanillaGate,
         range_gate: RangeGate,
-        stack: Stack<C::Scalar, 0>,
+        stack: Stack<C::Scalar>,
     }
 
     struct TestCircuit<

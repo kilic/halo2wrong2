@@ -15,7 +15,7 @@ mod composition {
     #[derive(Clone)]
     struct Config<F: PrimeField + Ord> {
         vanilla_gate: VanillaGate,
-        stack: Stack<F, 0>,
+        stack: Stack<F>,
     }
 
     #[derive(Clone, Default)]
@@ -70,7 +70,7 @@ mod arithmetic {
     struct Config<F: PrimeField + Ord> {
         vanilla_gate: VanillaGate,
         select_gate: SelectGate,
-        stack: Stack<F, 0>,
+        stack: Stack<F>,
     }
 
     #[derive(Clone, Default)]

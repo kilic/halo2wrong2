@@ -2,6 +2,8 @@ use crate::chip::IntegerChip;
 use crate::integer::{Integer, Range, UnassignedInteger};
 use circuitry::chip::first_degree::FirstDegreeChip;
 use circuitry::chip::range::RangeChip;
+use circuitry::chip::Core;
+use circuitry::stack::Stack;
 use circuitry::{
     utils::{big_to_fe, big_to_fe_unsafe, decompose, fe_to_big},
     witness::{Scaled, Witness},
@@ -19,7 +21,7 @@ impl<
 {
     pub fn register_constant(
         &self,
-        stack: &mut impl FirstDegreeChip<N>,
+        stack: &mut Stack<N>,
         constant: &W,
     ) -> Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
         let big = fe_to_big(constant);
@@ -47,9 +49,9 @@ impl<
         )
     }
 
-    pub fn range<Chip: RangeChip<N> + FirstDegreeChip<N>>(
+    pub fn range(
         &self,
-        chip: &mut Chip,
+        stack: &mut Stack<N>,
         integer: UnassignedInteger<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
         range: Range,
     ) -> Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
@@ -62,9 +64,9 @@ impl<
             .enumerate()
             .map(|(i, limb)| {
                 if i == NUMBER_OF_LIMBS - 1 {
-                    chip.decompose(*limb, last_limb_size, SUBLIMB_SIZE).0
+                    stack.decompose(*limb, last_limb_size, SUBLIMB_SIZE).0
                 } else {
-                    chip.decompose(*limb, LIMB_SIZE, SUBLIMB_SIZE).0
+                    stack.decompose(*limb, LIMB_SIZE, SUBLIMB_SIZE).0
                 }
             })
             .collect::<Vec<_>>();
@@ -75,7 +77,7 @@ impl<
             .map(|(limb, base)| Scaled::new(limb, *base))
             .collect::<Vec<Scaled<N>>>();
 
-        let native = chip.compose(&terms[..], N::ZERO);
+        let native = stack.compose(&terms[..], N::ZERO);
 
         Integer::new(
             &limbs.try_into().unwrap(),

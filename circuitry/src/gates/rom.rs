@@ -13,25 +13,31 @@ use crate::{
 use super::GateLayout;
 
 #[derive(Clone, Debug)]
-pub struct ROMGate<const W: usize> {
+pub struct ROMGate {
     pub(crate) query_selector: Selector,
     pub(crate) query_tag: Column<Fixed>,
     pub(crate) query_fraction: Column<Advice>,
     pub(crate) query_base: Column<Fixed>,
-    pub(crate) query: [Column<Advice>; W],
+    pub(crate) query: Vec<Column<Advice>>,
 
     pub(crate) table_tag: Column<Fixed>,
     pub(crate) table_address: Column<Fixed>,
-    pub(crate) table: [Column<Advice>; W],
+    pub(crate) table: Vec<Column<Advice>>,
+
+    size: usize,
 }
 
-impl<const W: usize> ROMGate<W> {
+impl ROMGate {
     pub fn configure<F: PrimeField>(
         meta: &mut ConstraintSystem<F>,
         query_fraction: Column<Advice>,
-        query: [Column<Advice>; W],
-        table: [Column<Advice>; W],
+        query: &[Column<Advice>],
+        table: &[Column<Advice>],
     ) -> Self {
+        assert!(!query.is_empty());
+        let size = query.len();
+        assert_eq!(size, table.len());
+
         let query_tag = meta.fixed_column();
         let table_tag = meta.fixed_column();
         let table_address = meta.fixed_column();
@@ -69,7 +75,10 @@ impl<const W: usize> ROMGate<W> {
             query
                 .into_iter()
                 .zip(table)
-                .chain(std::iter::once((query_fraction + query_base, table_address)))
+                .chain(std::iter::once((
+                    query_fraction + query_base,
+                    table_address,
+                )))
                 .chain(std::iter::once((query_tag, table_tag)))
                 .map(|(query, table)| (query_selector.clone() * query, table)) //
                 .collect::<Vec<_>>()
@@ -80,24 +89,23 @@ impl<const W: usize> ROMGate<W> {
             query_tag,
             query_base,
             query_fraction,
-            query,
+            query: query.to_vec(),
 
             table_tag,
             table_address,
-            table,
+            table: table.to_vec(),
+            size,
         }
     }
 }
 
-impl<F: PrimeField + Ord, const W: usize> GateLayout<F, Vec<crate::enforcement::ROM<F, W>>>
-    for ROMGate<W>
-{
+impl<F: PrimeField + Ord> GateLayout<F, Vec<crate::enforcement::ROM<F>>> for ROMGate {
     type Output = ();
 
     fn layout<L: Layouter<F>>(
         &self,
         ly_ctx: &mut LayoutCtx<F, L>,
-        e: Vec<crate::enforcement::ROM<F, W>>,
+        e: Vec<crate::enforcement::ROM<F>>,
     ) -> Result<(), Error> {
         #[cfg(feature = "info")]
         {
@@ -153,15 +161,16 @@ impl<F: PrimeField + Ord, const W: usize> GateLayout<F, Vec<crate::enforcement::
     }
 }
 
-impl<const W: usize> ROMGate<W> {
+impl ROMGate {
     fn read<F: PrimeField>(
         &self,
         ctx: &mut RegionCtx<'_, '_, F>,
         tag: F,
         address_base: F,
         address_fraction: &Witness<F>,
-        values: &[Witness<F>; W],
+        values: &[Witness<F>],
     ) -> Result<(), Error> {
+        assert_eq!(values.len(), self.size);
         // println!("READ");
         // println!("base: {:?}", base);
         // println!("fraction: {:?}", fraction.value());
@@ -171,9 +180,9 @@ impl<const W: usize> ROMGate<W> {
         // );
         let _ = values
             .iter()
-            .zip(self.query.into_iter())
+            .zip(self.query.iter())
             .map(|(limb, column)| {
-                let new_cell = ctx.advice(column, limb.value())?;
+                let new_cell = ctx.advice(*column, limb.value())?;
                 if let Some(id) = limb.id {
                     ctx.copy_chain(id, new_cell)?;
                 }
@@ -202,8 +211,9 @@ impl<const W: usize> ROMGate<W> {
         ctx: &mut RegionCtx<'_, '_, F>,
         tag: F,
         address: F,
-        values: &[Witness<F>; W],
+        values: &[Witness<F>],
     ) -> Result<(), Error> {
+        assert_eq!(values.len(), self.size);
         // println!("WRITE");
         // println!("address: {:?}", address);
         // println!(
@@ -212,9 +222,9 @@ impl<const W: usize> ROMGate<W> {
         // );
         let _ = values
             .iter()
-            .zip(self.table.into_iter())
+            .zip(self.table.iter())
             .map(|(limb, column)| {
-                let new_cell = ctx.advice(column, limb.value())?;
+                let new_cell = ctx.advice(*column, limb.value())?;
                 if let Some(id) = limb.id {
                     ctx.copy_chain(id, new_cell)?;
                 }

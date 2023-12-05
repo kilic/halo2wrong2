@@ -154,12 +154,11 @@ impl<F: PrimeField + Ord, const W: usize> VarVanillaGate<F, W> {
             .collect::<Vec<_>>()
             .try_into()
             .unwrap();
-        let fixed =
-            (0..W)
-                .map(|_| meta.fixed_column())
-                .collect::<Vec<_>>()
-                .try_into()
-                .unwrap();
+        let fixed = (0..W)
+            .map(|_| meta.fixed_column())
+            .collect::<Vec<_>>()
+            .try_into()
+            .unwrap();
 
         let s_mul = meta.fixed_column();
         let (s_next, constant) = (meta.fixed_column(), meta.fixed_column());
@@ -522,23 +521,21 @@ impl<F: PrimeField, const W: usize> VarVanillaGate<F, W> {
         terms: &[Term<F>],
         constant: F,
     ) -> Result<(), Error> {
-        let mut first_degree_terms: Vec<Scaled<F>> =
-            terms
-                .iter()
-                .filter_map(|term| match term {
-                    Term::First(term) => Some(*term),
-                    _ => None,
-                })
-                .collect();
+        let mut first_degree_terms: Vec<Scaled<F>> = terms
+            .iter()
+            .filter_map(|term| match term {
+                Term::First(term) => Some(*term),
+                _ => None,
+            })
+            .collect();
 
-        let second_degree_terms: Vec<SecondDegreeScaled<F>> =
-            terms
-                .iter()
-                .filter_map(|term| match term {
-                    Term::Second(term) => Some(*term),
-                    _ => None,
-                })
-                .collect();
+        let second_degree_terms: Vec<SecondDegreeScaled<F>> = terms
+            .iter()
+            .filter_map(|term| match term {
+                Term::Second(term) => Some(*term),
+                _ => None,
+            })
+            .collect();
 
         assert_eq!(
             first_degree_terms.len() + second_degree_terms.len(),

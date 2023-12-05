@@ -43,7 +43,7 @@ pub(crate) fn _max_value_in_range<F: PrimeField>(bit_size: usize) -> Value<F> {
     v!(big_to_fe(&u))
 }
 
-impl<F: PrimeField + Ord, const ROM_W: usize> Stack<F, ROM_W> {
+impl<F: PrimeField + Ord> Stack<F> {
     pub(crate) fn _assign_witness(&mut self, w: &Witness<F>) {
         let e = crate::enforcement::FirstDegree::new(vec![w.add(), w.sub()], F::ZERO);
         self.first_degree.push(e);
@@ -84,7 +84,7 @@ impl<F: PrimeField + Ord, const ROM_W: usize> Stack<F, ROM_W> {
     }
 }
 
-pub fn rand_stack_first_degree<F: PrimeField + Ord>(stack: &mut Stack<F, 0>, use_constants: bool) {
+pub fn rand_stack_first_degree<F: PrimeField + Ord>(stack: &mut Stack<F>, use_constants: bool) {
     let rand = || F::random(OsRng);
 
     let w0 = rand_value();
@@ -107,7 +107,7 @@ pub fn rand_stack_first_degree<F: PrimeField + Ord>(stack: &mut Stack<F, 0>, use
     }
 }
 
-pub fn rand_stack_range<F: PrimeField + Ord>(stack: &mut Stack<F, 0>) {
+pub fn rand_stack_range<F: PrimeField + Ord>(stack: &mut Stack<F>) {
     const LIMB_SIZE: usize = 8;
     for word_size in 1..31 {
         for _ in 0..11 {
@@ -117,7 +117,7 @@ pub fn rand_stack_range<F: PrimeField + Ord>(stack: &mut Stack<F, 0>) {
     }
 }
 
-pub fn rand_stack_second_degree<F: PrimeField + Ord>(stack: &mut Stack<F, 0>) {
+pub fn rand_stack_second_degree<F: PrimeField + Ord>(stack: &mut Stack<F>) {
     let rand = || F::random(OsRng);
 
     for n_first_degree in 0..20 {
@@ -169,7 +169,7 @@ pub fn rand_stack_second_degree<F: PrimeField + Ord>(stack: &mut Stack<F, 0>) {
     }
 }
 
-fn rand_arithmetic<F: PrimeField + Ord>() -> Stack<F, 0> {
+fn rand_arithmetic<F: PrimeField + Ord>() -> Stack<F> {
     let mut stack = Stack::default();
 
     let rand = || F::random(OsRng);
@@ -297,10 +297,9 @@ pub(crate) fn run_test<F: Ord + FromUniformBytes<64>, ConcreteCircuit: Circuit<F
     circuit: &ConcreteCircuit,
 ) {
     let public_inputs: Vec<Vec<F>> = vec![];
-    let prover =
-        match MockProver::run(k, circuit, public_inputs) {
-            Ok(prover) => prover,
-            Err(e) => panic!("{e:#?}"),
-        };
+    let prover = match MockProver::run(k, circuit, public_inputs) {
+        Ok(prover) => prover,
+        Err(e) => panic!("{e:#?}"),
+    };
     prover.assert_satisfied();
 }

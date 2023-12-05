@@ -1,9 +1,10 @@
 use crate::chip::IntegerChip;
 use crate::integer::{Integer, Range};
 use crate::schoolbook;
-use circuitry::chip::first_degree::FirstDegreeChip;
 use circuitry::chip::range::RangeChip;
 use circuitry::chip::second_degree::SecondDegreeChip;
+use circuitry::chip::Core;
+use circuitry::stack::Stack;
 use circuitry::witness::{Composable, Scaled, SecondDegreeScaled, Term, Witness};
 use ff::PrimeField;
 
@@ -21,17 +22,17 @@ impl<
         const SUBLIMB_SIZE: usize,
     > IntegerChip<W, N, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE>
 {
-    pub fn square<Chip: SecondDegreeChip<N> + FirstDegreeChip<N> + RangeChip<N>>(
+    pub fn square(
         &self,
-        chip: &mut Chip,
+        stack: &mut Stack<N>,
         w0: &Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
         to_add: &[&Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>],
     ) -> Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
         assert!(!self.is_gt_max_operand(w0));
 
         let (result, quotient) = self.rns.mul_witness(w0, w0, to_add);
-        let result = self.range(chip, result, Range::Remainder);
-        let quotient = self.range(chip, quotient, Range::MulQuotient);
+        let result = self.range(stack, result, Range::Remainder);
+        let quotient = self.range(stack, quotient, Range::MulQuotient);
 
         // t0 = a0a0
         // t1 = 2 * a0a1
@@ -113,10 +114,10 @@ impl<
                         .chain(std::iter::once(carry.clone()))
                         .collect::<Vec<_>>();
 
-                    let carry_0 = &chip.compose_second_degree(&terms[..], N::ZERO);
-                    let carry_1 = &chip.decompose(carry_0.value(), *max_carry, SUBLIMB_SIZE).0;
+                    let carry_0 = &stack.compose_second_degree(&terms[..], N::ZERO);
+                    let carry_1 = &stack.decompose(carry_0.value(), *max_carry, SUBLIMB_SIZE).0;
 
-                    chip.equal(carry_0, carry_1);
+                    stack.equal(carry_0, carry_1);
                     carry = carry_0.scale(*base).into();
                 })
         }
@@ -133,14 +134,14 @@ impl<
             .chain(std::iter::once(result.native().sub().into()))
             .collect();
 
-        chip.zero_sum_second_degree(&terms, N::ZERO);
+        stack.zero_sum_second_degree(&terms, N::ZERO);
 
         result
     }
 
-    pub fn mul<Chip: RangeChip<N> + SecondDegreeChip<N> + FirstDegreeChip<N>>(
+    pub fn mul(
         &self,
-        chip: &mut Chip,
+        stack: &mut Stack<N>,
         w0: &Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
         w1: &Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
         to_add: &[&Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>],
@@ -151,8 +152,8 @@ impl<
         // 1. find and range new witneses
 
         let (result, quotient) = self.rns.mul_witness(w0, w1, to_add);
-        let result = self.range(chip, result, Range::Remainder);
-        let quotient = self.range(chip, quotient, Range::MulQuotient);
+        let result = self.range(stack, result, Range::Remainder);
+        let quotient = self.range(stack, quotient, Range::MulQuotient);
 
         // 2. constrain carries
 
@@ -221,11 +222,11 @@ impl<
                         .chain(std::iter::once(carry.clone()))
                         .collect::<Vec<_>>();
 
-                    let carry_0 = &chip.compose_second_degree(&terms[..], N::ZERO);
+                    let carry_0 = &stack.compose_second_degree(&terms[..], N::ZERO);
 
-                    let carry_1 = &chip.decompose(carry_0.value(), *max_carry, SUBLIMB_SIZE).0;
+                    let carry_1 = &stack.decompose(carry_0.value(), *max_carry, SUBLIMB_SIZE).0;
 
-                    chip.equal(carry_0, carry_1);
+                    stack.equal(carry_0, carry_1);
                     carry = carry_0.scale(*base).into();
                 })
         }
@@ -242,14 +243,14 @@ impl<
             .chain(std::iter::once(result.native().sub().into()))
             .collect();
 
-        chip.zero_sum_second_degree(&terms, N::ZERO);
+        stack.zero_sum_second_degree(&terms, N::ZERO);
 
         result
     }
 
-    pub fn div<Stack: RangeChip<N> + SecondDegreeChip<N> + FirstDegreeChip<N>>(
+    pub fn div(
         &self,
-        chip: &mut Stack,
+        stack: &mut Stack<N>,
         w0: &Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
         w1: &Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
     ) -> Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
@@ -259,8 +260,8 @@ impl<
 
         let (result, quotient, shifter) = self.rns.div_witness(w0, w1);
 
-        let result = self.range(chip, result, Range::Remainder);
-        let quotient = self.range(chip, quotient, Range::MulQuotient);
+        let result = self.range(stack, result, Range::Remainder);
+        let quotient = self.range(stack, quotient, Range::MulQuotient);
 
         // 2. constrain carries
 
@@ -309,11 +310,11 @@ impl<
                         .chain(std::iter::once(carry.clone()))
                         .collect::<Vec<_>>();
 
-                    let carry_0 = &chip.compose_second_degree(&terms[..], *shifter * base);
+                    let carry_0 = &stack.compose_second_degree(&terms[..], *shifter * base);
 
-                    let carry_1 = &chip.decompose(carry_0.value(), *max_carry, SUBLIMB_SIZE).0;
+                    let carry_1 = &stack.decompose(carry_0.value(), *max_carry, SUBLIMB_SIZE).0;
 
-                    chip.equal(carry_0, carry_1);
+                    stack.equal(carry_0, carry_1);
                     carry = carry_0.scale(*base).into();
                 })
         }
@@ -323,7 +324,7 @@ impl<
         let w0w1: Term<N> = (result.native() * w1.native()).into();
         let pq: Term<N> = (quotient.native() * -self.rns.wrong_in_native).into();
         let r = w0.native().sub().into();
-        chip.zero_sum_second_degree(&[w0w1, pq, r], shifter.native());
+        stack.zero_sum_second_degree(&[w0w1, pq, r], shifter.native());
 
         result
     }
@@ -331,9 +332,9 @@ impl<
     // ported from barretenberg
     // https://github.com/Azte
 
-    pub fn neg_mul_div<Stack: RangeChip<N> + SecondDegreeChip<N> + FirstDegreeChip<N>>(
+    pub fn neg_mul_div(
         &self,
-        chip: &mut Stack,
+        stack: &mut Stack<N>,
         w0: &Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
         w1: &Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
         divisor: &Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
@@ -347,8 +348,8 @@ impl<
 
         let (result, quotient) = self.rns.neg_mul_add_div_witness(w0, w1, divisor, to_add);
 
-        let result = self.range(chip, result, Range::Remainder);
-        let quotient = self.range(chip, quotient, Range::MulQuotient);
+        let result = self.range(stack, result, Range::Remainder);
+        let quotient = self.range(stack, quotient, Range::MulQuotient);
 
         // 2. constrain carries
 
@@ -424,11 +425,11 @@ impl<
                         .chain(std::iter::once(carry.clone()))
                         .collect::<Vec<_>>();
 
-                    let carry_0 = &chip.compose_second_degree(&terms[..], N::ZERO);
+                    let carry_0 = &stack.compose_second_degree(&terms[..], N::ZERO);
 
-                    let carry_1 = &chip.decompose(carry_0.value(), *max_carry, SUBLIMB_SIZE).0;
+                    let carry_1 = &stack.decompose(carry_0.value(), *max_carry, SUBLIMB_SIZE).0;
 
-                    chip.equal(carry_0, carry_1);
+                    stack.equal(carry_0, carry_1);
                     carry = carry_0.scale(*base).into();
                 })
         }
@@ -445,7 +446,7 @@ impl<
             .chain(std::iter::once((divisor.native() * result.native()).into()))
             .collect();
 
-        chip.zero_sum_second_degree(&terms, N::ZERO);
+        stack.zero_sum_second_degree(&terms, N::ZERO);
 
         result
     }

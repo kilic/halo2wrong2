@@ -1,8 +1,6 @@
 use circuitry::{
-    chip::{
-        first_degree::FirstDegreeChip, range::RangeChip, second_degree::SecondDegreeChip,
-        select::SelectChip, ROMChip,
-    },
+    chip::{first_degree::FirstDegreeChip, range::RangeChip, Core},
+    stack::Stack,
     witness::{Composable, Witness},
 };
 use ff::{Field, PrimeField};
@@ -26,15 +24,9 @@ impl<
         const SUBLIMB_SIZE: usize,
     > BaseFieldEccChip<C, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE>
 {
-    pub fn msm_sliding_vertical<
-        Stack: SecondDegreeChip<C::Scalar>
-            + FirstDegreeChip<C::Scalar>
-            + SelectChip<C::Scalar>
-            + RangeChip<C::Scalar>,
-    >(
+    pub fn msm_sliding_vertical(
         &self,
-        stack: &mut Stack,
-
+        stack: &mut Stack<C::Scalar>,
         points: &[Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>],
         scalars: &[Witness<C::Scalar>],
         window_size: usize,
@@ -114,14 +106,9 @@ impl<
         self.sub_incomplete(stack, &acc.unwrap(), &correction)
     }
 
-    pub fn msm_sliding_vertical_rom<
-        Stack: SecondDegreeChip<C::Scalar>
-            + FirstDegreeChip<C::Scalar>
-            + ROMChip<C::Scalar, NUMBER_OF_LIMBS>
-            + RangeChip<C::Scalar>,
-    >(
+    pub fn msm_sliding_vertical_rom(
         &self,
-        stack: &mut Stack,
+        stack: &mut Stack<C::Scalar>,
         tag: C::Scalar,
         points: &[Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>],
         scalars: &[Witness<C::Scalar>],
@@ -223,15 +210,9 @@ impl<
         self.sub_incomplete(stack, &acc.unwrap(), &correction)
     }
 
-    pub fn msm_sliding_horizontal<
-        Stack: SecondDegreeChip<C::Scalar>
-            + FirstDegreeChip<C::Scalar>
-            + SelectChip<C::Scalar>
-            + RangeChip<C::Scalar>,
-    >(
+    pub fn msm_sliding_horizontal(
         &self,
-        stack: &mut Stack,
-
+        stack: &mut Stack<C::Scalar>,
         points: &[Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>],
         scalars: &[Witness<C::Scalar>],
         window_size: usize,
@@ -270,21 +251,20 @@ impl<
             correction = self.add_incomplete(stack, &correction, &aux_round_acc);
         }
 
-        let scalars =
-            scalars
-                .iter()
-                .map(|scalar| {
-                    let (_scalar, bits) =
-                        stack.decompose(scalar.value(), C::Scalar::NUM_BITS as usize, 1);
+        let scalars = scalars
+            .iter()
+            .map(|scalar| {
+                let (_scalar, bits) =
+                    stack.decompose(scalar.value(), C::Scalar::NUM_BITS as usize, 1);
 
-                    stack.equal(&_scalar, scalar);
+                stack.equal(&_scalar, scalar);
 
-                    bits.chunks(window_size)
-                        .rev()
-                        .map(|chunk| chunk.to_vec())
-                        .collect::<Vec<_>>()
-                })
-                .collect::<Vec<_>>();
+                bits.chunks(window_size)
+                    .rev()
+                    .map(|chunk| chunk.to_vec())
+                    .collect::<Vec<_>>()
+            })
+            .collect::<Vec<_>>();
 
         let mut acc = None;
         for i in 0..number_of_rounds {
@@ -310,14 +290,9 @@ impl<
         self.sub_incomplete(stack, &acc.unwrap(), &correction)
     }
 
-    pub fn msm_sliding_horizontal_rom<
-        Stack: SecondDegreeChip<C::Scalar>
-            + FirstDegreeChip<C::Scalar>
-            + ROMChip<C::Scalar, NUMBER_OF_LIMBS>
-            + RangeChip<C::Scalar>,
-    >(
+    pub fn msm_sliding_horizontal_rom(
         &self,
-        stack: &mut Stack,
+        stack: &mut Stack<C::Scalar>,
         tag: C::Scalar,
         points: &[Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>],
         scalars: &[Witness<C::Scalar>],

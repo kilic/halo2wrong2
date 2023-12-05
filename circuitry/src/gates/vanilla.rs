@@ -508,23 +508,21 @@ impl VanillaGate {
         terms: &[Term<F>],
         constant: F,
     ) -> Result<(), Error> {
-        let mut first_degree_terms: Vec<Scaled<F>> =
-            terms
-                .iter()
-                .filter_map(|term| match term {
-                    Term::First(term) => Some(*term),
-                    _ => None,
-                })
-                .collect();
+        let mut first_degree_terms: Vec<Scaled<F>> = terms
+            .iter()
+            .filter_map(|term| match term {
+                Term::First(term) => Some(*term),
+                _ => None,
+            })
+            .collect();
 
-        let second_degree_terms: Vec<SecondDegreeScaled<F>> =
-            terms
-                .iter()
-                .filter_map(|term| match term {
-                    Term::Second(term) => Some(*term),
-                    _ => None,
-                })
-                .collect();
+        let second_degree_terms: Vec<SecondDegreeScaled<F>> = terms
+            .iter()
+            .filter_map(|term| match term {
+                Term::Second(term) => Some(*term),
+                _ => None,
+            })
+            .collect();
 
         assert_eq!(
             first_degree_terms.len() + second_degree_terms.len(),

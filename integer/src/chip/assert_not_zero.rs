@@ -1,8 +1,8 @@
 use crate::chip::IntegerChip;
 use crate::integer::Integer;
 use circuitry::chip::first_degree::FirstDegreeChip;
-use circuitry::chip::range::RangeChip;
 use circuitry::chip::second_degree::SecondDegreeChip;
+use circuitry::stack::Stack;
 use circuitry::witness::Scaled;
 use ff::PrimeField;
 use num_bigint::BigUint;
@@ -15,9 +15,9 @@ impl<
         const SUBLIMB_SIZE: usize,
     > IntegerChip<W, N, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE>
 {
-    pub fn assert_not_zero<Stack: SecondDegreeChip<N> + FirstDegreeChip<N> + RangeChip<N>>(
+    pub fn assert_not_zero(
         &self,
-        stack: &mut Stack,
+        stack: &mut Stack<N>,
         w0: &Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
     ) {
         // unimplemented!();

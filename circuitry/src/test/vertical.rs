@@ -21,7 +21,7 @@ mod range {
     #[derive(Clone)]
     struct Config<F: PrimeField + Ord, const W: usize> {
         vertical_gate: VerticalGate<W>,
-        stack: Stack<F, 0>,
+        stack: Stack<F>,
     }
 
     #[derive(Clone, Default)]
@@ -39,7 +39,7 @@ mod range {
             let vertical_gate =
                 VerticalGate::configure(meta, &range_gate, advices.try_into().unwrap());
 
-            let mut stack: Stack<F, 0> = Stack::default();
+            let mut stack: Stack<F> = Stack::default();
             rand_stack_range::<_>(&mut stack);
 
             Self::Config {
@@ -77,7 +77,7 @@ mod composition {
 
     #[derive(Clone)]
     struct Config<F: PrimeField + Ord> {
-        stack: Stack<F, 0>,
+        stack: Stack<F>,
         vertical_gate: VerticalGate<1>,
     }
 
@@ -94,7 +94,7 @@ mod composition {
 
             let range_gate = RangeGate::configure(meta, &[advice]);
             let vertical_gate = VerticalGate::configure(meta, &range_gate, [advice]);
-            let mut stack: Stack<_, 0> = Stack::default();
+            let mut stack: Stack<_> = Stack::default();
             rand_stack_first_degree::<_>(&mut stack, false);
 
             Self::Config {

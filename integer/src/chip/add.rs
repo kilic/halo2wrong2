@@ -1,6 +1,7 @@
 use crate::chip::IntegerChip;
 use crate::integer::{ConstantInteger, Integer};
 use circuitry::chip::first_degree::FirstDegreeChip;
+use circuitry::stack::Stack;
 use circuitry::utils::compose;
 use circuitry::witness::{Composable, Scaled, Witness};
 use ff::PrimeField;
@@ -16,7 +17,7 @@ impl<
 {
     pub fn add(
         &self,
-        stack: &mut impl FirstDegreeChip<N>,
+        stack: &mut Stack<N>,
         a: &Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
         b: &Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
     ) -> Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
@@ -50,7 +51,7 @@ impl<
 
     pub fn add_constant(
         &self,
-        stack: &mut impl FirstDegreeChip<N>,
+        stack: &mut Stack<N>,
         a: &Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
         constant: &ConstantInteger<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
     ) -> Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
@@ -90,7 +91,7 @@ impl<
 
     pub fn sub(
         &self,
-        stack: &mut impl FirstDegreeChip<N>,
+        stack: &mut Stack<N>,
         a: &Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
         b: &Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
     ) -> Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
@@ -139,7 +140,7 @@ impl<
 
     pub fn neg(
         &self,
-        stack: &mut impl FirstDegreeChip<N>,
+        stack: &mut Stack<N>,
         a: &Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
     ) -> Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
         #[cfg(feature = "synth-sanity")]
@@ -185,7 +186,7 @@ impl<
 
     pub fn mul2(
         &self,
-        stack: &mut impl FirstDegreeChip<N>,
+        stack: &mut Stack<N>,
         a: &Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
     ) -> Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
         #[cfg(feature = "synth-sanity")]
@@ -216,7 +217,7 @@ impl<
 
     pub fn mul3(
         &self,
-        stack: &mut impl FirstDegreeChip<N>,
+        stack: &mut Stack<N>,
         a: &Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
     ) -> Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
         // #[cfg(feature = "synth-sanity")]

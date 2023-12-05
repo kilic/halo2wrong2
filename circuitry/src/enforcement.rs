@@ -3,17 +3,17 @@ use ff::PrimeField;
 use crate::witness::{Scaled, Term, Witness};
 
 #[derive(Clone, Debug)]
-pub enum ROM<F: PrimeField, const W: usize> {
+pub enum ROM<F: PrimeField> {
     Write {
         tag: F,
         address: F,
-        values: [Witness<F>; W],
+        values: Vec<Witness<F>>,
     },
     Read {
         tag: F,
         address_base: F,
         address_fraction: Witness<F>,
-        values: [Witness<F>; W],
+        values: Vec<Witness<F>>,
     },
 }
 

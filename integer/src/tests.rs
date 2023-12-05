@@ -87,8 +87,8 @@ fn make_stack<
     const SUBLIMB_SIZE: usize,
 >(
     rns: &Rns<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-) -> Stack<N, 0> {
-    let stack = &mut Stack::<N, 0>::default();
+) -> Stack<N> {
+    let stack = &mut Stack::default();
 
     let ch: IntegerChip<W, N, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE> = IntegerChip::new(rns);
 
@@ -352,7 +352,7 @@ struct TestConfig<
     vertical_gate: VerticalGate<RANGE_W>,
     vanilla_gate: VanillaGate,
     range_gate: RangeGate,
-    stack: Stack<N, 0>,
+    stack: Stack<N>,
 }
 
 #[derive(Clone, Default)]

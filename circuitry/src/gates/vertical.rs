@@ -40,12 +40,11 @@ impl<const W: usize> VerticalGate<W> {
 
         let base = meta.fixed_column();
         // let acc = meta.advice_column_in(SecondPhase);
-        let acc =
-            if W > 1 {
-                meta.advice_column_in(SecondPhase)
-            } else {
-                meta.advice_column()
-            };
+        let acc = if W > 1 {
+            meta.advice_column_in(SecondPhase)
+        } else {
+            meta.advice_column()
+        };
 
         advices
             .iter()

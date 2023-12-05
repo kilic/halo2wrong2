@@ -28,9 +28,7 @@ pub trait Chip<Op, F: PrimeField>: Core<F> {
     fn new_op(&mut self, e: Op);
 }
 
-pub trait ROMChip<F: PrimeField + Ord, const W: usize>:
-    Chip<crate::enforcement::ROM<F, W>, F>
-{
-    fn write(&mut self, tag: F, address: F, values: &[Witness<F>; W]);
-    fn read(&mut self, tag: F, address_base: F, address_fraction: &Witness<F>) -> [Witness<F>; W];
+pub trait ROMChip<F: PrimeField + Ord>: Chip<crate::enforcement::ROM<F>, F> {
+    fn write(&mut self, tag: F, address: F, values: &[Witness<F>]);
+    fn read(&mut self, tag: F, address_base: F, address_fraction: &Witness<F>) -> Vec<Witness<F>>;
 }

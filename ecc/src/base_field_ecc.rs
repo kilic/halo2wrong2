@@ -1,10 +1,4 @@
-use circuitry::{
-    chip::{
-        first_degree::FirstDegreeChip, range::RangeChip, second_degree::SecondDegreeChip,
-        select::SelectChip, Core, ROMChip,
-    },
-    witness::Witness,
-};
+use circuitry::{chip::Core, stack::Stack, witness::Witness};
 use ff::PrimeField;
 use halo2::{circuit::Value, halo2curves::CurveAffine};
 use integer::{
@@ -55,7 +49,7 @@ impl<
 
     pub fn assign_scalar(
         &self,
-        stack: &mut impl Core<C::Scalar>,
+        stack: &mut Stack<C::Scalar>,
         scalar: Value<C::Scalar>,
     ) -> Witness<C::Scalar> {
         stack.assign(scalar)
@@ -63,7 +57,7 @@ impl<
 
     pub fn register_constant(
         &self,
-        stack: &mut impl FirstDegreeChip<C::Scalar>,
+        stack: &mut Stack<C::Scalar>,
         point: C,
     ) -> Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE> {
         let coords = point.coordinates();
@@ -77,11 +71,9 @@ impl<
         Point::new(x, y)
     }
 
-    pub fn assign_point<
-        Stack: SecondDegreeChip<C::Scalar> + FirstDegreeChip<C::Scalar> + RangeChip<C::Scalar>,
-    >(
+    pub fn assign_point(
         &self,
-        stack: &mut Stack,
+        stack: &mut Stack<C::Scalar>,
         point: Value<C>,
     ) -> Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE> {
         let (x, y) = point
@@ -109,9 +101,9 @@ impl<
         point
     }
 
-    pub fn write_rom<Stack: FirstDegreeChip<C::Scalar> + ROMChip<C::Scalar, NUMBER_OF_LIMBS>>(
+    pub fn write_rom(
         &self,
-        stack: &mut Stack,
+        stack: &mut Stack<C::Scalar>,
         tag: C::Scalar,
         address: C::Scalar,
         y_offset: usize,
@@ -125,9 +117,9 @@ impl<
         self.ch.write(stack, tag, address + y_offset, point.y());
     }
 
-    pub fn read_rom<Stack: FirstDegreeChip<C::Scalar> + ROMChip<C::Scalar, NUMBER_OF_LIMBS>>(
+    pub fn read_rom(
         &self,
-        stack: &mut Stack,
+        stack: &mut Stack<C::Scalar>,
         tag: C::Scalar,
         address_base: C::Scalar,
         address_fraction: &Witness<C::Scalar>,
@@ -151,11 +143,9 @@ impl<
         Point::new(x, y)
     }
 
-    pub fn assert_on_curve<
-        Stack: SecondDegreeChip<C::Scalar> + FirstDegreeChip<C::Scalar> + RangeChip<C::Scalar>,
-    >(
+    pub fn assert_on_curve(
         &self,
-        stack: &mut Stack,
+        stack: &mut Stack<C::Scalar>,
         point: &Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>,
     ) {
         let y_square = &self.ch.square(stack, point.y(), &[]);
@@ -167,7 +157,7 @@ impl<
 
     pub fn copy_equal(
         &self,
-        stack: &mut impl Core<C::Scalar>,
+        stack: &mut Stack<C::Scalar>,
         p0: &Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>,
         p1: &Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>,
     ) {
@@ -175,12 +165,9 @@ impl<
         self.ch.copy_equal(stack, p0.y(), p1.y());
     }
 
-    pub fn normal_equal<
-        Stack: SecondDegreeChip<C::Scalar> + FirstDegreeChip<C::Scalar> + RangeChip<C::Scalar>,
-    >(
+    pub fn normal_equal(
         &self,
-        stack: &mut Stack,
-
+        stack: &mut Stack<C::Scalar>,
         p0: &Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>,
         p1: &Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>,
     ) {
@@ -189,12 +176,9 @@ impl<
         self.ch.normal_equal(stack, p0.y(), p1.y());
     }
 
-    pub fn normalize<
-        Stack: SecondDegreeChip<C::Scalar> + FirstDegreeChip<C::Scalar> + RangeChip<C::Scalar>,
-    >(
+    pub fn normalize(
         &self,
-        stack: &mut Stack,
-
+        stack: &mut Stack<C::Scalar>,
         point: &Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>,
     ) -> Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE> {
         let x = &self.ch.reduce(stack, point.x());
@@ -204,8 +188,7 @@ impl<
 
     pub fn select(
         &self,
-        stack: &mut impl SelectChip<C::Scalar>,
-
+        stack: &mut Stack<C::Scalar>,
         c: &Witness<C::Scalar>,
         p1: &Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>,
         p2: &Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>,
@@ -217,8 +200,7 @@ impl<
 
     pub fn select_multi(
         &self,
-        stack: &mut impl SelectChip<C::Scalar>,
-
+        stack: &mut Stack<C::Scalar>,
         selector: &[Witness<C::Scalar>],
         table: &[Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>],
     ) -> Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE> {
@@ -234,64 +216,9 @@ impl<
         reducer[0].clone()
     }
 
-    // pub fn select_or_assign(
-    //     &self,
-    //     stack: &mut impl SelectChip<C::Scalar>,
-
-    //     c: &Witness<C::Scalar>,
-    //     p1: &Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>,
-    //     p2: C,
-    // ) -> Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE> {
-    //     let p2 = ConstantPoint::<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>::new(p2);
-    //     let x = &self.ch.select_or_assign(stack, p1.x(), p2.x(), c);
-    //     let y = &self.ch.select_or_assign(stack, p1.y(), p2.y(), c);
-    //     Point::new(x, y)
-    // }
-
-    // pub fn select_constant(
-    //     &self,
-    //     stack: &mut impl SelectChip<C::Scalar>,
-
-    //     c: &Witness<C::Scalar>,
-    //     p1: &ConstantPoint<C::Base, C::ScalarExt, NUMBER_OF_LIMBS, LIMB_SIZE>,
-    //     p2: &ConstantPoint<C::Base, C::ScalarExt, NUMBER_OF_LIMBS, LIMB_SIZE>,
-    // ) -> Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE> {
-    //     let x = &self.ch.select_constant(stack, c, p1.x(), p2.x());
-    //     let y = &self.ch.select_constant(stack, c, p1.y(), p2.y());
-    //     Point::new(x, y)
-    // }
-
-    // pub fn select_constant_multi(
-    //     &self,
-    //     stack: &mut impl SelectChip<C::Scalar>,
-
-    //     selector: &[Witness<C::Scalar>],
-    //     table: &[ConstantPoint<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>],
-    // ) -> Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE> {
-    //     let number_of_selectors = selector.len();
-    //     let n = 1 << (number_of_selectors - 1);
-    //     let mut reducer = (0..n)
-    //         .map(|j| {
-    //             let k = 2 * j;
-    //             self.select_constant(stack, &selector[0], &table[k + 1], &table[k])
-    //         })
-    //         .collect::<Vec<Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>>>();
-    //     for (i, selector) in selector.iter().skip(1).enumerate() {
-    //         let n = 1 << (number_of_selectors - 2 - i);
-    //         for j in 0..n {
-    //             let k = 2 * j;
-    //             reducer[j] = self.select(stack, selector, &reducer[k + 1], &reducer[k]);
-    //         }
-    //     }
-    //     reducer[0].clone()
-    // }
-
-    pub fn add_incomplete<
-        Stack: SecondDegreeChip<C::Scalar> + FirstDegreeChip<C::Scalar> + RangeChip<C::Scalar>,
-    >(
+    pub fn add_incomplete(
         &self,
-        stack: &mut Stack,
-
+        stack: &mut Stack<C::Scalar>,
         a: &Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>,
         b: &Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>,
     ) -> Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE> {
@@ -311,12 +238,9 @@ impl<
         Point::new(x, y)
     }
 
-    pub fn sub_incomplete<
-        Stack: SecondDegreeChip<C::Scalar> + FirstDegreeChip<C::Scalar> + RangeChip<C::Scalar>,
-    >(
+    pub fn sub_incomplete(
         &self,
-        stack: &mut Stack,
-
+        stack: &mut Stack<C::Scalar>,
         a: &Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>,
         b: &Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>,
     ) -> Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE> {
@@ -337,12 +261,9 @@ impl<
         Point::new(x, y)
     }
 
-    pub fn double_incomplete<
-        Stack: SecondDegreeChip<C::Scalar> + FirstDegreeChip<C::Scalar> + RangeChip<C::Scalar>,
-    >(
+    pub fn double_incomplete(
         &self,
-        stack: &mut Stack,
-
+        stack: &mut Stack<C::Scalar>,
         point: &Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>,
     ) -> Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE> {
         // lambda = (3 * a_x^2) / 2 * a_y
@@ -380,12 +301,9 @@ impl<
 
     // ported from barretenberg
     // https://github.com/AztecProtocol/barretenberg/blob/master/cpp/src/barretenberg/stdlib/primitives/biggroup/biggroup_impl.hpp
-    pub fn add_multi<
-        Stack: SecondDegreeChip<C::Scalar> + FirstDegreeChip<C::Scalar> + RangeChip<C::Scalar>,
-    >(
+    pub fn add_multi(
         &self,
-        stack: &mut Stack,
-
+        stack: &mut Stack<C::Scalar>,
         points: &[Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>],
     ) -> Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE> {
         assert!(!points.is_empty());

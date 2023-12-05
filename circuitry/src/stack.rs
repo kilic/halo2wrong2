@@ -17,7 +17,7 @@ use crate::{
 };
 
 #[derive(Clone, Debug, Default)]
-pub struct Stack<F: PrimeField + Ord, const ROM_W: usize> {
+pub struct Stack<F: PrimeField + Ord> {
     // to give uniques id to witnesses
     pub(crate) number_of_witnesses: u32,
     // store registred constants
@@ -37,23 +37,27 @@ pub struct Stack<F: PrimeField + Ord, const ROM_W: usize> {
     // selection enforcements to be layouted
     pub(crate) selections: Vec<crate::enforcement::Selection<F>>,
     // ROM enforcements
-    pub(crate) rom: Vec<crate::enforcement::ROM<F, ROM_W>>,
+    pub(crate) rom: Vec<crate::enforcement::ROM<F>>,
     // memory itself
-    pub(crate) rom_db: BTreeMap<F, BTreeMap<F, [F; ROM_W]>>,
+    pub(crate) rom_db: BTreeMap<F, BTreeMap<F, Vec<F>>>,
+    // size of rom values
+    rom_size: usize,
 }
 
-impl<F: PrimeField + Ord, const ROM_W: usize> Core<F> for Stack<F, ROM_W> {
+impl<F: PrimeField + Ord> Stack<F> {
+    pub fn with_rom(rom_size: usize) -> Self {
+        Stack::<F> {
+            rom_size,
+            ..Default::default()
+        }
+    }
+}
+
+impl<F: PrimeField + Ord> Core<F> for Stack<F> {
     fn new_witness(&mut self, value: Value<F>) -> Witness<F> {
         self.number_of_witnesses += 1;
         Witness::new(self.number_of_witnesses, value)
     }
-
-    // fn new_witness_in_range(&mut self, value: Value<F>, bit_size: usize) -> Witness<F> {
-    //     self.number_of_witnesses += 1;
-    //     let witness = Witness::new_in_range(self.number_of_witnesses, value, bit_size);
-    //     self.range_tables.insert(bit_size);
-    //     witness
-    // }
 
     fn equal(&mut self, w0: &Witness<F>, w1: &Witness<F>) {
         match (w0.id, w1.id) {
@@ -83,25 +87,9 @@ impl<F: PrimeField + Ord, const ROM_W: usize> Core<F> for Stack<F, ROM_W> {
         self.zero_sum(&[w.add(), w.sub()], F::ZERO);
         w
     }
-
-    // fn bases(&mut self, bit_size: usize) -> Vec<F> {
-    //     macro_rules! div_ceil {
-    //         ($a:expr, $b:expr) => {
-    //             (($a - 1) / $b) + 1
-    //         };
-    //     }
-    //     self.pow_of_twos
-    //         .entry(bit_size)
-    //         .or_insert_with(|| {
-    //             (0..div_ceil!(F::NUM_BITS as usize, bit_size))
-    //                 .map(|i| F::from(2).pow([(bit_size * i) as u64, 0, 0, 0]))
-    //                 .collect()
-    //         })
-    //         .clone()
-    // }
 }
 
-impl<F: PrimeField + Ord, const ROM_W: usize> Stack<F, ROM_W> {
+impl<F: PrimeField + Ord> Stack<F> {
     pub fn layout_first_degree<
         L: Layouter<F>,
         Gate: GateLayout<F, Vec<crate::enforcement::FirstDegree<F>>>,
@@ -172,10 +160,7 @@ impl<F: PrimeField + Ord, const ROM_W: usize> Stack<F, ROM_W> {
         Ok(())
     }
 
-    pub fn layout_rom<
-        L: Layouter<F>,
-        Gate: GateLayout<F, Vec<crate::enforcement::ROM<F, ROM_W>>>,
-    >(
+    pub fn layout_rom<L: Layouter<F>, Gate: GateLayout<F, Vec<crate::enforcement::ROM<F>>>>(
         &mut self,
         ly: &mut LayoutCtx<F, L>,
         gate: &Gate,
@@ -219,25 +204,19 @@ impl<F: PrimeField + Ord, const ROM_W: usize> Stack<F, ROM_W> {
     }
 }
 
-impl<F: PrimeField + Ord, const ROM_W: usize> Chip<crate::enforcement::FirstDegree<F>, F>
-    for Stack<F, ROM_W>
-{
+impl<F: PrimeField + Ord> Chip<crate::enforcement::FirstDegree<F>, F> for Stack<F> {
     fn new_op(&mut self, e: crate::enforcement::FirstDegree<F>) {
         self.first_degree.push(e);
     }
 }
 
-impl<F: PrimeField + Ord, const ROM_W: usize> Chip<crate::enforcement::RangeLimbs<F>, F>
-    for Stack<F, ROM_W>
-{
+impl<F: PrimeField + Ord> Chip<crate::enforcement::RangeLimbs<F>, F> for Stack<F> {
     fn new_op(&mut self, e: crate::enforcement::RangeLimbs<F>) {
         self.range.push(e);
     }
 }
 
-impl<F: PrimeField + Ord, const ROM_W: usize> Chip<crate::enforcement::RangeOp<F>, F>
-    for Stack<F, ROM_W>
-{
+impl<F: PrimeField + Ord> Chip<crate::enforcement::RangeOp<F>, F> for Stack<F> {
     fn new_op(&mut self, e: crate::enforcement::RangeOp<F>) {
         match e {
             crate::enforcement::RangeOp::Single(e) => {
@@ -260,84 +239,71 @@ impl<F: PrimeField + Ord, const ROM_W: usize> Chip<crate::enforcement::RangeOp<F
     }
 }
 
-impl<F: PrimeField + Ord, const ROM_W: usize> Chip<crate::enforcement::SecondDegree<F>, F>
-    for Stack<F, ROM_W>
-{
+impl<F: PrimeField + Ord> Chip<crate::enforcement::SecondDegree<F>, F> for Stack<F> {
     fn new_op(&mut self, e: crate::enforcement::SecondDegree<F>) {
         self.second_degree.push(e);
     }
 }
 
-impl<F: PrimeField + Ord, const ROM_W: usize> Chip<crate::enforcement::Selection<F>, F>
-    for Stack<F, ROM_W>
-{
+impl<F: PrimeField + Ord> Chip<crate::enforcement::Selection<F>, F> for Stack<F> {
     fn new_op(&mut self, e: crate::enforcement::Selection<F>) {
         self.selections.push(e);
     }
 }
 
-impl<F: PrimeField + Ord, const ROM_W: usize> SelectChip<F> for Stack<F, ROM_W> {}
+impl<F: PrimeField + Ord> SelectChip<F> for Stack<F> {}
 
-impl<F: PrimeField + Ord, const ROM_W: usize> RangeChip<F> for Stack<F, ROM_W> {}
+impl<F: PrimeField + Ord> RangeChip<F> for Stack<F> {}
 
-impl<F: PrimeField + Ord, const ROM_W: usize> crate::chip::first_degree::FirstDegreeChip<F>
-    for Stack<F, ROM_W>
-{
-}
+impl<F: PrimeField + Ord> crate::chip::first_degree::FirstDegreeChip<F> for Stack<F> {}
 
-impl<F: PrimeField + Ord, const ROM_W: usize> crate::chip::second_degree::SecondDegreeChip<F>
-    for Stack<F, ROM_W>
-{
-}
+impl<F: PrimeField + Ord> crate::chip::second_degree::SecondDegreeChip<F> for Stack<F> {}
 
-impl<F: PrimeField + Ord, const ROM_W: usize> Chip<crate::enforcement::ROM<F, ROM_W>, F>
-    for Stack<F, ROM_W>
-{
-    fn new_op(&mut self, e: crate::enforcement::ROM<F, ROM_W>) {
+impl<F: PrimeField + Ord> Chip<crate::enforcement::ROM<F>, F> for Stack<F> {
+    fn new_op(&mut self, e: crate::enforcement::ROM<F>) {
         self.rom.push(e);
     }
 }
 
-impl<F: PrimeField + Ord, const W: usize> ROMChip<F, W> for Stack<F, W> {
-    fn write(&mut self, tag: F, address: F, values: &[Witness<F>; W]) {
+impl<F: PrimeField + Ord> ROMChip<F> for Stack<F> {
+    fn write(&mut self, tag: F, address: F, values: &[Witness<F>]) {
+        assert!(values.len() == self.rom_size);
         self.new_op(crate::enforcement::ROM::Write {
             tag,
             address,
-            values: *values,
+            values: values.to_vec(),
         });
 
         let values = values.iter().map(|value| value.value()).collect::<Vec<_>>();
         let values: Value<Vec<F>> = Value::from_iter(values);
         values.map(|values| {
-            let values = values.try_into().unwrap();
             self.rom_db
                 .entry(tag)
                 .and_modify(|memory| {
-                    assert!(memory.insert(address, values).is_none());
+                    assert!(memory.insert(address, values.clone()).is_none());
                 })
                 .or_insert_with(|| BTreeMap::from([(address, values)]));
         });
     }
 
-    fn read(&mut self, tag: F, address_base: F, address_fraction: &Witness<F>) -> [Witness<F>; W] {
+    fn read(&mut self, tag: F, address_base: F, address_fraction: &Witness<F>) -> Vec<Witness<F>> {
         let values = address_fraction.value().map(|address_fraction| {
             let address = address_fraction + address_base;
             let memory = self.rom_db.get(&tag).unwrap();
             let values = memory.get(&address).unwrap();
-            *values
+            values.clone()
         });
-        let values = values.transpose_array();
+        let values = values.transpose_vec(self.rom_size);
         let values = values
             .into_iter()
             .map(|value| self.new_witness(value))
             .collect::<Vec<_>>();
-        let values = values.try_into().unwrap();
 
         self.new_op(crate::enforcement::ROM::Read {
             tag,
             address_base,
             address_fraction: *address_fraction,
-            values,
+            values: values.clone(),
         });
 
         values
