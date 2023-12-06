@@ -269,7 +269,7 @@ impl<
         let result: Value<Vec<N>> = Value::from_iter(result);
         let result = result.map(|limbs| limbs.try_into().unwrap());
         let result = UnassignedInteger::from_limbs(result);
-        let result = self.range(stack, result, Range::Remainder);
+        let result = self.range(stack, &result, Range::Remainder);
 
         // first
         let terms = [

@@ -7,16 +7,10 @@ use circuitry::gates::vertical::VerticalGate;
 use circuitry::stack::Stack;
 use ff::Field;
 use ff::FromUniformBytes;
-use ff::PrimeField;
 use group::{Curve, Group};
-
-use halo2::halo2curves::bn256::{Bn256, G1Affine, G1};
+use halo2::halo2curves::bn256::{G1Affine, G1};
 use halo2::halo2curves::CurveExt;
-use halo2::plonk::{create_proof, keygen_pk, keygen_vk, Advice, Column};
-use halo2::poly::commitment::ParamsProver;
-use halo2::poly::kzg::commitment::{KZGCommitmentScheme, ParamsKZG};
-use halo2::poly::kzg::multiopen::ProverSHPLONK;
-use halo2::transcript::{Blake2bWrite, Challenge255, TranscriptWriterBuffer};
+use halo2::plonk::{Advice, Column};
 use halo2::{
     circuit::{Layouter, SimpleFloorPlanner, Value},
     dev::MockProver,
@@ -31,12 +25,10 @@ use circuitry::LayoutCtx;
 use rand_core::OsRng;
 
 use crate::base_field_ecc::BaseFieldEccChip;
+use crate::test::run_test_prover;
 use crate::Point;
 
-pub(crate) fn _multiexp_naive_var<C: CurveExt>(point: &[C], scalar: &[C::ScalarExt]) -> C
-where
-    <C::ScalarExt as PrimeField>::Repr: AsRef<[u8]>,
-{
+pub(crate) fn _multiexp_naive_var<C: CurveExt>(point: &[C], scalar: &[C::ScalarExt]) -> C {
     assert!(!point.is_empty());
     assert_eq!(point.len(), scalar.len());
     point
@@ -293,7 +285,6 @@ fn run_test<
 ) where
     C::Scalar: FromUniformBytes<64>,
 {
-    // let aux_generator = Value::known(C::CurveExt::random(OsRng).into());
     let aux_generator = Value::known(C::CurveExt::generator().into());
     let params = Params {
         aux_generator,
@@ -301,7 +292,6 @@ fn run_test<
         window,
     };
     let circuit = TestCircuit::<C, RANGE_W, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE> { params };
-    // let public_inputs = vec![vec![]];
     let public_inputs = vec![];
     let prover = match MockProver::run(k, &circuit, public_inputs) {
         Ok(prover) => prover,
@@ -314,14 +304,6 @@ fn run_test<
 fn test_msm() {
     use halo2::halo2curves::pasta::EqAffine;
 
-    // run_test::<
-    //     EqAffine,
-    //     3,  // number of limbs
-    //     88, // limb size
-    //     4,  // number of sublimbs
-    //     22, // sublimb size
-    // >(23);
-
     run_test::<
         EqAffine,
         2,
@@ -329,48 +311,6 @@ fn test_msm() {
         90, // limb size
         18, // sublimb size
     >(19, 100, 6);
-
-    // run_test::<
-    //     EqAffine,
-    //     RangeInPlaceSpaseGate<Fp, 2, 18>,
-    //     3,  // number of limbs
-    //     90, // limb size
-    //     5,  // number of sublimbs
-    //     18, // sublimb size
-    // >(20);
-}
-
-fn run_test_prover<
-    const RANGE_W: usize,
-    const NUMBER_OF_LIMBS: usize,
-    const LIMB_SIZE: usize,
-    const SUBLIMB_SIZE: usize,
->(
-    k: u32,
-    circuit: TestCircuit<G1Affine, RANGE_W, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE>,
-) {
-    println!("params read");
-    let params = read_srs(k);
-    println!("gen vk");
-    let vk = keygen_vk(&params, &circuit).unwrap();
-    println!("gen pk");
-    let pk = keygen_pk(&params, vk, &circuit).unwrap();
-    println!("pk write");
-
-    let mut transcript = Blake2bWrite::<_, _, Challenge255<_>>::init(vec![]);
-
-    let t0 = start_timer!(|| "prover");
-    let proof = create_proof::<KZGCommitmentScheme<Bn256>, ProverSHPLONK<Bn256>, _, _, _, _>(
-        &params,
-        &pk,
-        &[circuit],
-        &[&[]],
-        OsRng,
-        &mut transcript,
-    );
-    end_timer!(t0);
-
-    proof.expect("proof generation should not fail");
 }
 
 #[test]
@@ -384,35 +324,5 @@ fn bench_prover() {
         window: 6,
     };
     let circuit = TestCircuit::<G1Affine, 2, 3, 90, 18> { params };
-
-    run_test_prover::<
-        2,
-        3,  // number of limbs
-        90, // limb size
-        18, // sublimb size
-    >(19, circuit);
-}
-
-fn write_srs(k: u32) -> ParamsKZG<Bn256> {
-    let path = format!("srs_{k}.bin");
-    let params = ParamsKZG::<Bn256>::new(k);
-    params
-        .write_custom(
-            &mut std::fs::File::create(path).unwrap(),
-            halo2::SerdeFormat::RawBytesUnchecked,
-        )
-        .unwrap();
-    params
-}
-
-fn read_srs(k: u32) -> ParamsKZG<Bn256> {
-    let path = format!("srs_{k}.bin");
-    let file = std::fs::File::open(path.as_str());
-    match file {
-        Ok(mut file) => {
-            ParamsKZG::<Bn256>::read_custom(&mut file, halo2::SerdeFormat::RawBytesUnchecked)
-                .unwrap()
-        }
-        Err(_) => write_srs(k),
-    }
+    run_test_prover(19, circuit);
 }

@@ -36,6 +36,8 @@ pub struct Rns<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const
 
     pub(super) number_of_carries: usize,
 
+    pub max_most_significant_limb_size: usize,
+
     pub(super) _max_unreduced_limb: BigUint,
     pub(super) _max_unreduced_value: BigUint,
 
@@ -129,6 +131,7 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const LIMB_SIZE
         let max_limb = (one << LIMB_SIZE) - 1usize;
 
         let max_most_significant_limb = max_remainder >> ((NUMBER_OF_LIMBS - 1) * LIMB_SIZE);
+        let max_most_significant_limb_size = max_most_significant_limb.bits() as usize;
         let max_remainder_limbs = std::iter::repeat_with(|| max_limb.clone())
             .take(NUMBER_OF_LIMBS - 1)
             .chain(std::iter::once(max_most_significant_limb))
@@ -216,6 +219,8 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const LIMB_SIZE
             max_operand_limbs,
             _max_limb: max_limb,
             number_of_carries,
+
+            max_most_significant_limb_size,
 
             _max_unreduced_limb: max_unreduced_limb,
             _max_unreduced_value: max_unreduced_value,

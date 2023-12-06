@@ -31,8 +31,8 @@ impl<
         assert!(!self.is_gt_max_operand(w0));
 
         let (result, quotient) = self.rns.mul_witness(w0, w0, to_add);
-        let result = self.range(stack, result, Range::Remainder);
-        let quotient = self.range(stack, quotient, Range::MulQuotient);
+        let result = self.range(stack, &result, Range::Remainder);
+        let quotient = self.range(stack, &quotient, Range::MulQuotient);
 
         // t0 = a0a0
         // t1 = 2 * a0a1
@@ -152,8 +152,8 @@ impl<
         // 1. find and range new witneses
 
         let (result, quotient) = self.rns.mul_witness(w0, w1, to_add);
-        let result = self.range(stack, result, Range::Remainder);
-        let quotient = self.range(stack, quotient, Range::MulQuotient);
+        let result = self.range(stack, &result, Range::Remainder);
+        let quotient = self.range(stack, &quotient, Range::MulQuotient);
 
         // 2. constrain carries
 
@@ -260,8 +260,8 @@ impl<
 
         let (result, quotient, shifter) = self.rns.div_witness(w0, w1);
 
-        let result = self.range(stack, result, Range::Remainder);
-        let quotient = self.range(stack, quotient, Range::MulQuotient);
+        let result = self.range(stack, &result, Range::Remainder);
+        let quotient = self.range(stack, &quotient, Range::MulQuotient);
 
         // 2. constrain carries
 
@@ -348,8 +348,8 @@ impl<
 
         let (result, quotient) = self.rns.neg_mul_add_div_witness(w0, w1, divisor, to_add);
 
-        let result = self.range(stack, result, Range::Remainder);
-        let quotient = self.range(stack, quotient, Range::MulQuotient);
+        let result = self.range(stack, &result, Range::Remainder);
+        let quotient = self.range(stack, &quotient, Range::MulQuotient);
 
         // 2. constrain carries
 

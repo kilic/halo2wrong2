@@ -25,7 +25,7 @@ impl<
     ) -> Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
         let (result, quotient) = self.rns.reduction_witness(integer);
 
-        let result = self.range(stack, result, Range::Remainder);
+        let result = self.range(stack, &result, Range::Remainder);
         println!("LIMB_SIZE = {:?}", LIMB_SIZE);
         println!("SUBLIMB_SIZE = {:?}", SUBLIMB_SIZE);
         let quotient = stack.decompose(quotient, LIMB_SIZE, SUBLIMB_SIZE).0;

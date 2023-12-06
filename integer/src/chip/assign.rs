@@ -52,7 +52,7 @@ impl<
     pub fn range(
         &self,
         stack: &mut Stack<N>,
-        integer: UnassignedInteger<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
+        integer: &UnassignedInteger<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
         range: Range,
     ) -> Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
         let max_values = self.rns.max_values(range);

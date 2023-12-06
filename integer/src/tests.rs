@@ -94,10 +94,10 @@ fn make_stack<
 
     {
         let zero = ch.rns.zero();
-        let zero = ch.range(stack, zero, Range::Remainder);
+        let zero = ch.range(stack, &zero, Range::Remainder);
         ch.assert_zero(stack, &zero);
         let zero = ch.rns.modulus();
-        let zero = ch.range(stack, zero, Range::Remainder);
+        let zero = ch.range(stack, &zero, Range::Remainder);
         ch.assert_zero(stack, &zero);
     }
 
@@ -105,14 +105,14 @@ fn make_stack<
     {
         for _ in 0..100 {
             let a0 = ch.rns.rand_in_field();
-            let a0 = ch.range(stack, a0, Range::Remainder);
+            let a0 = ch.range(stack, &a0, Range::Remainder);
             ch.assert_in_field(stack, &a0);
         }
 
         let a0 = ch.rns.rand_in_field();
         let a1 = ch.rns.rand_in_field();
         let a1 = ch.assign(stack, a1, Range::Remainder);
-        let a0 = ch.range(stack, a0, Range::Remainder);
+        let a0 = ch.range(stack, &a0, Range::Remainder);
         ch.assert_not_equal(stack, &a0, &a1);
         ch.assert_not_zero(stack, &a0);
         let a1 = ch.reduce(stack, &a0);
@@ -122,7 +122,7 @@ fn make_stack<
         let a0 = ch.rns.rand_in_remainder_range();
         let a1 = ch.rns.rand_in_remainder_range();
         let a1 = ch.assign(stack, a1, Range::Remainder);
-        let a0 = ch.range(stack, a0, Range::Remainder);
+        let a0 = ch.range(stack, &a0, Range::Remainder);
         ch.assert_not_equal(stack, &a0, &a1);
         ch.assert_not_zero(stack, &a0);
         let a1 = ch.reduce(stack, &a0);
@@ -130,7 +130,7 @@ fn make_stack<
 
         let a0 = ch.rns.rand_in_operand_range();
         let a1 = ch.rns.rand_in_operand_range();
-        let a0 = ch.range(stack, a0, Range::Operand);
+        let a0 = ch.range(stack, &a0, Range::Operand);
         let a1 = ch.assign(stack, a1, Range::Operand);
         ch.assert_not_equal(stack, &a0, &a1);
         ch.assert_not_zero(stack, &a0);
@@ -158,8 +158,8 @@ fn make_stack<
         // add
         let a0 = ch.rns.rand_in_remainder_range();
         let a1 = ch.rns.rand_in_remainder_range();
-        let a0 = &ch.range(stack, a0, Range::Remainder);
-        let a1 = &ch.range(stack, a1, Range::Remainder);
+        let a0 = &ch.range(stack, &a0, Range::Remainder);
+        let a1 = &ch.range(stack, &a1, Range::Remainder);
 
         let u0 = ch.add(stack, a0, a1);
         let u1 = ch.add(stack, a1, a0);
@@ -172,7 +172,7 @@ fn make_stack<
 
         // add constant
         let a0 = ch.rns.rand_in_remainder_range();
-        let a0 = &ch.range(stack, a0, Range::Remainder);
+        let a0 = &ch.range(stack, &a0, Range::Remainder);
         let constant = &ch.rns.rand_constant();
         let u0 = ch.add_constant(stack, a0, constant);
         u0.value()
@@ -181,7 +181,7 @@ fn make_stack<
 
         // neg
         let a0 = ch.rns.rand_in_remainder_range();
-        let a0 = &ch.range(stack, a0, Range::Remainder);
+        let a0 = &ch.range(stack, &a0, Range::Remainder);
         let neg_a0 = ch.neg(stack, a0);
 
         let u0 = ch.add(stack, a0, &neg_a0);
@@ -208,11 +208,11 @@ fn make_stack<
         // mul
         let a0 = ch.rns.rand_in_field();
         let a1 = ch.rns.rand_in_field();
-        let a0 = &ch.range(stack, a0, Range::Remainder);
-        let a1 = &ch.range(stack, a1, Range::Remainder);
+        let a0 = &ch.range(stack, &a0, Range::Remainder);
+        let a1 = &ch.range(stack, &a1, Range::Remainder);
         let res = a0.value().zip(a1.value()).map(|(a0, a1)| a0 * a1);
         let u0 = UnassignedInteger::from_fe(res);
-        let u0 = ch.range(stack, u0, Range::Remainder);
+        let u0 = ch.range(stack, &u0, Range::Remainder);
         let u1 = ch.mul(stack, a0, a1, &[]);
         ch.copy_equal(stack, &u0, &u1);
         ch.normal_equal(stack, &u0, &u1);
@@ -224,17 +224,17 @@ fn make_stack<
         // mul sub
         let a0 = ch.rns.rand_in_field();
         let a1 = ch.rns.rand_in_field();
-        let a0 = &ch.range(stack, a0, Range::Remainder);
-        let a1 = &ch.range(stack, a1, Range::Remainder);
+        let a0 = &ch.range(stack, &a0, Range::Remainder);
+        let a1 = &ch.range(stack, &a1, Range::Remainder);
         let to_sub = ch.rns.rand_in_field();
-        let to_sub = ch.range(stack, to_sub, Range::Remainder);
+        let to_sub = ch.range(stack, &to_sub, Range::Remainder);
         let res = a0
             .value()
             .zip(a1.value())
             .zip(to_sub.value())
             .map(|((a0, a1), to_sub)| a0 * a1 - to_sub);
         let u0 = UnassignedInteger::from_fe(res);
-        let u0 = ch.range(stack, u0, Range::Remainder);
+        let u0 = ch.range(stack, &u0, Range::Remainder);
         let to_sub = ch.neg(stack, &to_sub);
 
         let u1 = ch.mul(stack, a0, a1, &[&to_sub]);
@@ -248,10 +248,10 @@ fn make_stack<
 
         // square
         let a0 = ch.rns.rand_in_field();
-        let a0 = &ch.range(stack, a0, Range::Remainder);
+        let a0 = &ch.range(stack, &a0, Range::Remainder);
         let res = a0.value().map(|a0| (a0 * a0));
         let u0 = UnassignedInteger::from_fe(res);
-        let u0 = ch.range(stack, u0, Range::Remainder);
+        let u0 = ch.range(stack, &u0, Range::Remainder);
         let u1 = ch.square(stack, a0, &[]);
 
         ch.copy_equal(stack, &u0, &u1);
@@ -262,15 +262,15 @@ fn make_stack<
 
         // square sub
         let a0 = ch.rns.rand_in_field();
-        let a0 = &ch.range(stack, a0, Range::Remainder);
+        let a0 = &ch.range(stack, &a0, Range::Remainder);
         let to_sub = ch.rns.rand_in_field();
-        let to_sub = ch.range(stack, to_sub, Range::Remainder);
+        let to_sub = ch.range(stack, &to_sub, Range::Remainder);
         let res = a0
             .value()
             .zip(to_sub.value())
             .map(|(a0, to_sub)| a0 * a0 - to_sub);
         let u0 = UnassignedInteger::from_fe(res);
-        let u0 = ch.range(stack, u0, Range::Remainder);
+        let u0 = ch.range(stack, &u0, Range::Remainder);
         let to_sub = ch.neg(stack, &to_sub);
         let u1 = ch.square(stack, a0, &[&to_sub]);
         ch.copy_equal(stack, &u0, &u1);
@@ -288,14 +288,14 @@ fn make_stack<
             //     .rns
             //     .from_big(BigUint::from(30u32) + &ch.rns.wrong_modulus);
             // let a1 = ch.rns.from_big(BigUint::from(5u32));
-            let a0 = &ch.range(stack, a0, Range::Operand);
-            let a1 = &ch.range(stack, a1, Range::Operand);
+            let a0 = &ch.range(stack, &a0, Range::Operand);
+            let a1 = &ch.range(stack, &a1, Range::Operand);
             let res = a0
                 .value()
                 .zip(a1.value())
                 .map(|(a0, a1)| a0 * a1.invert().unwrap());
             let u0 = UnassignedInteger::from_fe(res);
-            let u0 = ch.range(stack, u0, Range::Remainder);
+            let u0 = ch.range(stack, &u0, Range::Remainder);
             let u1 = ch.div(stack, a0, a1);
             ch.copy_equal(stack, &u0, &u1);
             ch.normal_equal(stack, &u0, &u1);
@@ -306,11 +306,11 @@ fn make_stack<
         let a1 = ch.rns.rand_in_operand_range();
         let divisor = ch.rns.rand_in_operand_range();
         let to_add = ch.rns.rand_in_field();
-        let a0 = &ch.range(stack, a0, Range::Operand);
-        let a1 = &ch.range(stack, a1, Range::Operand);
+        let a0 = &ch.range(stack, &a0, Range::Operand);
+        let a1 = &ch.range(stack, &a1, Range::Operand);
 
-        let divisor = &ch.range(stack, divisor, Range::Operand);
-        let to_add = ch.range(stack, to_add, Range::Remainder);
+        let divisor = &ch.range(stack, &divisor, Range::Operand);
+        let to_add = ch.range(stack, &to_add, Range::Remainder);
         let u1 = ch.neg_mul_div(stack, a0, a1, divisor, &[&to_add]);
 
         let res = a0
@@ -323,7 +323,7 @@ fn make_stack<
             });
 
         let u0 = UnassignedInteger::from_fe(res);
-        let u0 = ch.range(stack, u0, Range::Remainder);
+        let u0 = ch.range(stack, &u0, Range::Remainder);
 
         u1.value()
             .zip(a0.value())

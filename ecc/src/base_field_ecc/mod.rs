@@ -10,6 +10,8 @@ use integer::{
 use crate::Point;
 
 pub mod mul_var;
+#[cfg(test)]
+mod test;
 
 #[derive(Debug, Clone)]
 pub struct BaseFieldEccChip<
@@ -90,10 +92,10 @@ impl<
 
         let x = &self
             .ch
-            .range(stack, UnassignedInteger::from_fe(x), Range::Remainder);
+            .range(stack, &UnassignedInteger::from_fe(x), Range::Remainder);
         let y = &self
             .ch
-            .range(stack, UnassignedInteger::from_fe(y), Range::Remainder);
+            .range(stack, &UnassignedInteger::from_fe(y), Range::Remainder);
 
         let point = Point::new(x, y);
         self.assert_on_curve(stack, &point);
