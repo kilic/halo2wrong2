@@ -9,6 +9,7 @@ use integer::{
 
 use crate::Point;
 
+pub mod ecdsa;
 pub mod mul_fix;
 pub mod mul_var;
 

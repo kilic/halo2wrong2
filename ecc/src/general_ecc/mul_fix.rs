@@ -3,7 +3,7 @@ use crate::Point;
 use circuitry::{
     chip::{range::RangeChip, Core},
     stack::Stack,
-    witness::{Composable, Witness},
+    witness::Composable,
 };
 use ff::PrimeField;
 use group::{Curve, Group};

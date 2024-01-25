@@ -300,6 +300,17 @@ impl<
         );
     }
 
+    pub fn reduce_external<T: PrimeField>(
+        &self,
+        stack: &mut Stack<N>,
+        a: &Integer<T, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
+    ) -> Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
+        let max_values = self.rns.max_values(Range::Remainder);
+        let a = Integer::new(&a.limbs(), &max_values, a.big(), *a.native());
+        self.reduce(stack, &a);
+        a
+    }
+
     // TODO: this is not sound. use only in tests
     pub fn assign(
         &self,
