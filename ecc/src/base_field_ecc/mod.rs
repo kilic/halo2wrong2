@@ -9,6 +9,7 @@ use integer::{
 
 use crate::Point;
 
+pub mod mul_fix;
 pub mod mul_var;
 #[cfg(test)]
 mod test;
@@ -21,7 +22,8 @@ pub struct BaseFieldEccChip<
     const SUBLIMB_SIZE: usize,
 > {
     pub ch: IntegerChip<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE>,
-    aux_generator: Value<C>,
+    witness_aux: Value<C>,
+    constant_aux: C,
     b: ConstantInteger<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>,
 }
 
@@ -34,12 +36,14 @@ impl<
 {
     pub fn new(
         rns: &Rns<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>,
-        aux_generator: Value<C>,
+        witness_aux: Value<C>,
+        constant_aux: C,
     ) -> Self {
         let ch = IntegerChip::new(rns);
         let b = Self::parameter_b();
         Self {
-            aux_generator,
+            witness_aux,
+            constant_aux,
             b,
             ch,
         }

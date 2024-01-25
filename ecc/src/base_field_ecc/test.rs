@@ -46,14 +46,15 @@ fn make_stack<
     const SUBLIMB_SIZE: usize,
 >(
     rns: &Rns<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>,
-    aux_generator: Value<C>,
+    witness_aux: Value<C>,
+    constant_aux: C,
     window_size: usize,
     number_of_points: usize,
 ) -> Stack<C::Scalar> {
     let stack = &mut Stack::<C::Scalar>::with_rom(NUMBER_OF_LIMBS);
 
     let ch: BaseFieldEccChip<C, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE> =
-        BaseFieldEccChip::new(rns, aux_generator);
+        BaseFieldEccChip::new(rns, witness_aux, constant_aux);
 
     fn value<T>(e: T) -> Value<T> {
         Value::known(e)
@@ -114,38 +115,56 @@ fn make_stack<
         ch.normal_equal(stack, &c0, &c1);
     }
 
-    let tag0 = C::Scalar::random(OsRng);
-    // let tag1 = C::Scalar::random(OsRng);
+    // mul var
+    {
+        let tag0 = C::Scalar::random(OsRng);
+        // let tag1 = C::Scalar::random(OsRng);
 
-    let points: Vec<C::CurveExt> = (0..number_of_points)
-        .map(|_| C::CurveExt::random(OsRng))
-        .collect();
+        let points: Vec<C::CurveExt> = (0..number_of_points)
+            .map(|_| C::CurveExt::random(OsRng))
+            .collect();
 
-    let scalars: Vec<C::Scalar> = (0..number_of_points)
-        .map(|_| C::Scalar::random(OsRng))
-        .collect();
+        let scalars: Vec<C::Scalar> = (0..number_of_points)
+            .map(|_| C::Scalar::random(OsRng))
+            .collect();
 
-    let res0 = _multiexp_naive_var(&points[..], &scalars[..]).to_affine();
+        let res0 = _multiexp_naive_var(&points[..], &scalars[..]).to_affine();
 
-    #[allow(clippy::type_complexity)]
-    let (points, scalars): (
-        Vec<Point<C::Base, C::ScalarExt, NUMBER_OF_LIMBS, LIMB_SIZE>>,
-        Vec<Witness<C::ScalarExt>>,
-    ) = points
-        .into_iter()
-        .zip(scalars)
-        .map(|(point, scalar)| {
-            let point = ch.assign_point(stack, value(point.into()));
-            let scalar = ch.assign_scalar(stack, value(scalar));
-            (point, scalar)
-        })
-        .unzip();
+        #[allow(clippy::type_complexity)]
+        let (points, scalars): (
+            Vec<Point<C::Base, C::ScalarExt, NUMBER_OF_LIMBS, LIMB_SIZE>>,
+            Vec<Witness<C::ScalarExt>>,
+        ) = points
+            .into_iter()
+            .zip(scalars)
+            .map(|(point, scalar)| {
+                let point = ch.assign_point(stack, value(point.into()));
+                let scalar = ch.assign_scalar(stack, value(scalar));
+                (point, scalar)
+            })
+            .unzip();
 
-    let res1 = ch.msm_sliding_vertical_rom(stack, tag0, &points[..], &scalars[..], window_size);
-    res1.value::<C>().map(|res1| assert_eq!(res0, res1));
+        let res1 = ch.msm_sliding_vertical_rom(stack, tag0, &points[..], &scalars[..], window_size);
+        res1.value::<C>().map(|res1| assert_eq!(res0, res1));
 
-    let res0 = ch.assign_point(stack, value(res0));
-    ch.normal_equal(stack, &res0, &res1);
+        let res0 = ch.assign_point(stack, value(res0));
+        ch.normal_equal(stack, &res0, &res1);
+    }
+
+    // mul fix
+    {
+        let point = C::CurveExt::random(OsRng);
+        let prepared = ch.prepare_mul_fix(stack, point.into());
+
+        let scalar = C::Scalar::random(OsRng);
+        let res0 = _multiexp_naive_var(&[point], &[scalar]).to_affine();
+        let scalar = ch.assign_scalar(stack, value(scalar));
+        let res1 = ch.mul_fix(stack, &prepared, &scalar);
+        res1.value::<C>().map(|res1| assert_eq!(res0, res1));
+        let res1 = ch.mul_fix(stack, &prepared, &scalar);
+        let res0 = ch.assign_point(stack, value(res0));
+        ch.normal_equal(stack, &res0, &res1);
+    }
 
     stack.clone()
 }
@@ -167,7 +186,8 @@ struct TestConfig<
 
 #[derive(Default, Clone)]
 struct Params<C: CurveAffine> {
-    aux_generator: Value<C>,
+    witness_aux: Value<C>,
+    constant_aux: C,
     number_of_points: usize,
     window: usize,
 }
@@ -224,7 +244,8 @@ impl<
         let t0 = start_timer!(|| "witness gen");
         let stack = make_stack::<C, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE>(
             &rns,
-            params.aux_generator,
+            params.witness_aux,
+            params.constant_aux,
             params.window,
             params.number_of_points,
         );
@@ -285,9 +306,12 @@ fn run_test<
 ) where
     C::Scalar: FromUniformBytes<64>,
 {
-    let aux_generator = Value::known(C::CurveExt::generator().into());
+    let witness_aux = Value::known(C::Curve::random(OsRng).into());
+    let constant_aux = C::Curve::random(OsRng).into();
+
     let params = Params {
-        aux_generator,
+        witness_aux,
+        constant_aux,
         number_of_points,
         window,
     };
@@ -301,11 +325,11 @@ fn run_test<
 }
 
 #[test]
-fn test_msm() {
-    use halo2::halo2curves::pasta::EqAffine;
+fn test_base_field_ecc() {
+    use halo2::halo2curves::bn256::G1Affine;
 
     run_test::<
-        EqAffine,
+        G1Affine,
         2,
         3,  // number of limbs
         90, // limb size
@@ -316,10 +340,12 @@ fn test_msm() {
 #[test]
 #[ignore]
 fn bench_prover() {
-    let aux_generator = Value::known(G1::random(OsRng).into());
+    let witness_aux = Value::known(G1::random(OsRng).into());
+    let constant_aux = G1::random(OsRng).into();
 
     let params = Params {
-        aux_generator,
+        witness_aux,
+        constant_aux,
         number_of_points: 100,
         window: 6,
     };

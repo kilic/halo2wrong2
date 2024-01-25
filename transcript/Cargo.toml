@@ -8,8 +8,8 @@ version = "0.2.0"
 circuitry = {path = "../circuitry"}
 ecc = {path = "../ecc"}
 integer = {path = "../integer"}
-# halo2 = { package = "halo2_proofs", git = "https://github.com/privacy-scaling-explorations/halo2", features = ["circuit-params"] }
-halo2 = {package = "halo2_proofs", path = "../../../privacy-scaling-explorations/halo2/halo2_proofs", features = ["circuit-params"]}
+halo2 = { package = "halo2_proofs", git = "https://github.com/privacy-scaling-explorations/halo2", features = ["circuit-params"] }
+# halo2 = {package = "halo2_proofs", path = "../../../privacy-scaling-explorations/halo2/halo2_proofs", features = ["circuit-params"]}
 poseidon = {git = "https://github.com/privacy-scaling-explorations/poseidon.git", tag = "v2023_04_20"}
 subtle = {version = "2.3", default-features = false}
 

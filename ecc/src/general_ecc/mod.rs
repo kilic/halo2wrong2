@@ -9,6 +9,7 @@ use integer::{
 
 use crate::Point;
 
+pub mod mul_fix;
 pub mod mul_var;
 
 #[cfg(test)]
@@ -24,7 +25,8 @@ pub struct GeneralEccChip<
 > {
     pub ch_base: IntegerChip<Emulated::Base, N, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE>,
     pub ch_scalar: IntegerChip<Emulated::Scalar, N, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE>,
-    aux_generator: Value<Emulated>,
+    constant_aux: Emulated,
+    witness_aux: Value<Emulated>,
     b: ConstantInteger<Emulated::Base, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
 }
 
@@ -39,14 +41,16 @@ impl<
     pub fn new(
         rns_base: &Rns<Emulated::Base, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
         rns_scalar: &Rns<Emulated::Scalar, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-        aux_generator: Value<Emulated>,
+        witness_aux: Value<Emulated>,
+        constant_aux: Emulated,
     ) -> Self {
         let ch_base = IntegerChip::new(rns_base);
         let ch_scalar = IntegerChip::new(rns_scalar);
 
         let b = Self::parameter_b();
         Self {
-            aux_generator,
+            witness_aux,
+            constant_aux,
             b,
             ch_base,
             ch_scalar,

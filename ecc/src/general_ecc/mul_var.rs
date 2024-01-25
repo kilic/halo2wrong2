@@ -37,7 +37,7 @@ impl<
         assert!(number_of_points > 0);
         assert_eq!(number_of_points, scalars.len());
 
-        let mut round_aux = self.assign_point(stack, self.aux_generator);
+        let mut round_aux = self.assign_point(stack, self.witness_aux);
         let mut round_aux_acc = None;
 
         let tables = points
@@ -133,7 +133,7 @@ impl<
         assert_eq!(number_of_points, scalars.len());
         let table_size = (1 << window_size) as usize;
 
-        let mut round_aux = self.assign_point(stack, self.aux_generator);
+        let mut round_aux = self.assign_point(stack, self.witness_aux);
         let mut round_aux_acc = None;
 
         points
@@ -249,7 +249,7 @@ impl<
         let number_of_rounds = div_ceil!(Emulated::Scalar::NUM_BITS as usize, window_size);
         let table_size = 1 << window_size;
 
-        let mut aux_pow2 = self.assign_point(stack, self.aux_generator);
+        let mut aux_pow2 = self.assign_point(stack, self.witness_aux);
         let mut aux_round_acc = aux_pow2.clone();
         let tables: Vec<Vec<Point<Emulated::Base, N, NUMBER_OF_LIMBS, LIMB_SIZE>>> = points
             .iter()
@@ -342,7 +342,7 @@ impl<
         let number_of_rounds = div_ceil!(Emulated::Scalar::NUM_BITS as usize, window_size);
         let table_size = 1 << window_size;
 
-        let mut aux_pow2 = self.assign_point(stack, self.aux_generator);
+        let mut aux_pow2 = self.assign_point(stack, self.witness_aux);
         let mut aux_round_acc = aux_pow2.clone();
 
         points.iter().enumerate().for_each(|(point_idx, point)| {

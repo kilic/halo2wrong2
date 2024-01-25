@@ -48,14 +48,15 @@ fn make_stack<
 >(
     rns_base: &Rns<Emulated::Base, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
     rns_scalar: &Rns<Emulated::Scalar, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-    aux_generator: Value<Emulated>,
+    witness_aux: Value<Emulated>,
+    constant_aux: Emulated,
     window_size: usize,
     number_of_points: usize,
 ) -> Stack<N> {
     let stack = &mut Stack::<N>::with_rom(NUMBER_OF_LIMBS);
 
     let ecc_ch: GeneralEccChip<Emulated, N, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE> =
-        GeneralEccChip::new(rns_base, rns_scalar, aux_generator);
+        GeneralEccChip::new(rns_base, rns_scalar, witness_aux, constant_aux);
 
     fn value<T>(e: T) -> Value<T> {
         Value::known(e)
@@ -116,42 +117,61 @@ fn make_stack<
         ecc_ch.normal_equal(stack, &c0, &c1);
     }
 
-    let points: Vec<Emulated::Curve> = (0..number_of_points)
-        .map(|_| Emulated::Curve::random(OsRng))
-        .collect();
+    // mul var
+    {
+        let points: Vec<Emulated::Curve> = (0..number_of_points)
+            .map(|_| Emulated::Curve::random(OsRng))
+            .collect();
 
-    let scalars: Vec<Emulated::Scalar> = (0..number_of_points)
-        .map(|_| Emulated::Scalar::random(OsRng))
-        .collect();
+        let scalars: Vec<Emulated::Scalar> = (0..number_of_points)
+            .map(|_| Emulated::Scalar::random(OsRng))
+            .collect();
 
-    let res0 = _multiexp_naive_var(&points[..], &scalars[..]).to_affine();
+        let res0 = _multiexp_naive_var(&points[..], &scalars[..]).to_affine();
 
-    #[allow(clippy::type_complexity)]
-    let (points, scalars): (
-        Vec<Point<Emulated::Base, N, NUMBER_OF_LIMBS, LIMB_SIZE>>,
-        Vec<Integer<Emulated::Scalar, N, NUMBER_OF_LIMBS, LIMB_SIZE>>,
-    ) = points
-        .into_iter()
-        .zip(scalars)
-        .map(|(point, scalar)| {
-            let point = ecc_ch.assign_point(stack, value(point.into()));
-            let scalar = ecc_ch.assign_scalar(stack, value(scalar));
-            (point, scalar)
-        })
-        .unzip();
+        #[allow(clippy::type_complexity)]
+        let (points, scalars): (
+            Vec<Point<Emulated::Base, N, NUMBER_OF_LIMBS, LIMB_SIZE>>,
+            Vec<Integer<Emulated::Scalar, N, NUMBER_OF_LIMBS, LIMB_SIZE>>,
+        ) = points
+            .into_iter()
+            .zip(scalars)
+            .map(|(point, scalar)| {
+                let point = ecc_ch.assign_point(stack, value(point.into()));
+                let scalar = ecc_ch.assign_scalar(stack, value(scalar));
+                (point, scalar)
+            })
+            .unzip();
 
-    let res1: Point<<Emulated as CurveAffine>::Base, N, NUMBER_OF_LIMBS, LIMB_SIZE> = ecc_ch
-        .msm_sliding_vertical_rom(
-            stack,
-            N::random(OsRng),
-            &points[..],
-            &scalars[..],
-            window_size,
-        );
-    res1.value::<Emulated>().map(|res1| assert_eq!(res0, res1));
+        let res1: Point<<Emulated as CurveAffine>::Base, N, NUMBER_OF_LIMBS, LIMB_SIZE> = ecc_ch
+            .msm_sliding_vertical_rom(
+                stack,
+                N::random(OsRng),
+                &points[..],
+                &scalars[..],
+                window_size,
+            );
+        res1.value::<Emulated>().map(|res1| assert_eq!(res0, res1));
 
-    let res0 = ecc_ch.assign_point(stack, value(res0));
-    ecc_ch.normal_equal(stack, &res0, &res1);
+        let res0 = ecc_ch.assign_point(stack, value(res0));
+        ecc_ch.normal_equal(stack, &res0, &res1);
+    }
+
+    // mul fix
+    {
+        let point = Emulated::Curve::random(OsRng);
+        let prepared = ecc_ch.prepare_mul_fix(stack, point.into());
+
+        let scalar = Emulated::Scalar::random(OsRng);
+        let res0 = _multiexp_naive_var(&[point], &[scalar]).to_affine();
+        // let scalar = ecc_ch.assign_scalar(stack, value(scalar));
+        let scalar = ecc_ch.assign_scalar(stack, value(scalar));
+        let res1 = ecc_ch.mul_fix(stack, &prepared, &scalar);
+        res1.value::<Emulated>().map(|res1| assert_eq!(res0, res1));
+        let res1 = ecc_ch.mul_fix(stack, &prepared, &scalar);
+        let res0 = ecc_ch.assign_point(stack, value(res0));
+        ecc_ch.normal_equal(stack, &res0, &res1);
+    }
 
     stack.clone()
 }
@@ -175,7 +195,8 @@ struct TestConfig<
 
 #[derive(Default, Clone)]
 struct Params<Emulated: CurveAffine> {
-    aux_generator: Value<Emulated>,
+    witness_aux: Value<Emulated>,
+    constant_aux: Emulated,
     number_of_points: usize,
     window: usize,
 }
@@ -234,7 +255,8 @@ impl<
         let stack = make_stack::<Emulated, N, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE>(
             &rns_base,
             &rns_scalar,
-            params.aux_generator,
+            params.witness_aux,
+            params.constant_aux,
             params.window,
             params.number_of_points,
         );
@@ -298,9 +320,11 @@ fn run_test<
 ) where
     N: FromUniformBytes<64>,
 {
-    let aux_generator = Value::known(Emulated::Curve::generator().into());
+    let witness_aux = Value::known(Emulated::Curve::random(OsRng).into());
+    let constant_aux = Emulated::Curve::random(OsRng).into();
     let params = Params {
-        aux_generator,
+        witness_aux,
+        constant_aux,
         number_of_points,
         window,
     };
@@ -317,7 +341,7 @@ fn run_test<
 }
 
 #[test]
-fn test_msm() {
+fn test_general_ecc() {
     run_test::<
         EqAffine,
         Fr,
@@ -331,9 +355,11 @@ fn test_msm() {
 #[test]
 // #[ignore]
 fn bench_prover() {
-    let aux_generator = Value::known(Eq::random(OsRng).into());
+    let witness_aux = Value::known(Eq::random(OsRng).into());
+    let constant_aux = Eq::random(OsRng).into();
     let params = Params {
-        aux_generator,
+        witness_aux,
+        constant_aux,
         number_of_points: 100,
         window: 6,
     };

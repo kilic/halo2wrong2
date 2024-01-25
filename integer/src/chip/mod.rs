@@ -300,6 +300,7 @@ impl<
         );
     }
 
+    // TODO: this is not sound. use only in tests
     pub fn assign(
         &self,
         stack: &mut Stack<N>,
