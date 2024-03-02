@@ -15,6 +15,14 @@ impl<
         const SUBLIMB_SIZE: usize,
     > IntegerChip<W, N, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE>
 {
+    pub fn double(
+        &self,
+        stack: &mut Stack<N>,
+        a: &Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
+    ) -> Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
+        self.add(stack, a, a)
+    }
+
     pub fn add(
         &self,
         stack: &mut Stack<N>,

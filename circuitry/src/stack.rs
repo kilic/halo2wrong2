@@ -202,6 +202,11 @@ impl<F: PrimeField + Ord> Stack<F> {
         let u = self.sub(w0, w1);
         self.assert_not_zero(&u)
     }
+
+    pub fn is_one(&mut self, w0: &Witness<F>) -> Witness<F> {
+        let zero = self.sub_from_constant(F::ONE, w0);
+        self.is_zero(&zero)
+    }
 }
 
 impl<F: PrimeField + Ord> Chip<crate::enforcement::FirstDegree<F>, F> for Stack<F> {

@@ -94,6 +94,9 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const LIMB_SIZE
         let mut debug = f.debug_struct("Integer");
 
         self.big.as_ref().map(|big| {
+            debug.field("field:  ", &format!("{:#?}", big_to_fe::<W>(big)));
+        });
+        self.big.as_ref().map(|big| {
             debug.field(
                 "value:  ",
                 &format!("{}, 0x{}", big.bits(), big.to_str_radix(16)),
