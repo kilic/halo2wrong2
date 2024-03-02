@@ -18,6 +18,18 @@ impl<
         const SUBLIMB_SIZE: usize,
     > IntegerChip<W, N, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE>
 {
+    pub fn reduce_if_necessary(
+        &self,
+        stack: &mut Stack<N>,
+        integer: &Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
+    ) -> Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
+        if self.is_gt_max_operand(integer) {
+            self.reduce(stack, integer)
+        } else {
+            integer.clone()
+        }
+    }
+
     pub fn reduce(
         &self,
         stack: &mut Stack<N>,
@@ -26,8 +38,6 @@ impl<
         let (result, quotient) = self.rns.reduction_witness(integer);
 
         let result = self.range(stack, &result, Range::Remainder);
-        println!("LIMB_SIZE = {:?}", LIMB_SIZE);
-        println!("SUBLIMB_SIZE = {:?}", SUBLIMB_SIZE);
         let quotient = stack.decompose(quotient, LIMB_SIZE, SUBLIMB_SIZE).0;
 
         let base = self.rns.rsh(1);
@@ -68,8 +78,6 @@ impl<
                 }
                 let carry_tmp_0: Witness<N> = stack.compose(&terms[..], N::ZERO);
 
-                println!("carry_max = {:?}", carry_max);
-                println!("SUBLIMB_SIZE = {:?}", SUBLIMB_SIZE);
                 let carry_tmp_1 = &stack
                     .decompose(carry_tmp_0.value(), carry_max as usize, SUBLIMB_SIZE)
                     .0;

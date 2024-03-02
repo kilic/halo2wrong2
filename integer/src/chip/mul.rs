@@ -28,7 +28,7 @@ impl<
         w0: &Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
         to_add: &[&Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>],
     ) -> Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
-        assert!(!self.is_gt_max_operand(w0));
+        let w0 = &self.reduce_if_necessary(stack, w0);
 
         let (result, quotient) = self.rns.mul_witness(w0, w0, to_add);
         let result = self.range(stack, &result, Range::Remainder);
@@ -146,8 +146,8 @@ impl<
         w1: &Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
         to_add: &[&Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>],
     ) -> Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
-        assert!(!self.is_gt_max_operand(w0));
-        assert!(!self.is_gt_max_operand(w1));
+        let w0 = &self.reduce_if_necessary(stack, w0);
+        let w1 = &self.reduce_if_necessary(stack, w1);
 
         // 1. find and range new witneses
 

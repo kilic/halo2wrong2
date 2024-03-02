@@ -1,4 +1,5 @@
 use crate::integer::Integer;
+use ark_std::iterable::Iterable;
 use ff::PrimeField;
 use halo2::circuit::Value;
 use num_bigint::BigUint;
@@ -83,7 +84,7 @@ fn calculate_base_sub_aux<
     // `base_aux = 2 * wrong_modulus`
     let mut aux: Vec<BigUint> = wrong_limbs
         .iter()
-        .map(|limb| fe_to_big(limb) << 1usize)
+        .map(|limb| fe_to_big(&limb) << 1usize)
         .collect();
 
     // If value of a limb is not above dense limb borrow from the next one
@@ -221,6 +222,38 @@ impl<
         sign
     }
 
+    pub fn is_zero_strict(
+        &self,
+        stack: &mut Stack<N>,
+        w: &Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
+    ) -> Witness<N> {
+        let w = self.reduce(stack, w);
+        self.assert_in_field(stack, &w);
+        let mut acc: Option<Witness<N>> = None;
+        w.limbs().iter().for_each(|limb| {
+            let is_zero = stack.is_zero(&limb);
+            let _acc = acc.map_or(is_zero, |acc| stack.mul(&is_zero, &acc));
+            acc = Some(_acc);
+        });
+        acc.unwrap()
+    }
+
+    pub fn is_one_strict(
+        &self,
+        stack: &mut Stack<N>,
+        w: &Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
+    ) -> Witness<N> {
+        let w = self.reduce(stack, w);
+        self.assert_in_field(stack, &w);
+        println!("zzz1");
+        let mut acc = stack.is_one(w.limb_at(0));
+        w.limbs().iter().skip(1).for_each(|limb| {
+            let is_zero = stack.is_zero(&limb);
+            acc = stack.mul(&is_zero, &acc);
+        });
+        acc
+    }
+
     pub fn assert_in_field(
         &self,
         stack: &mut Stack<N>,
@@ -306,7 +339,7 @@ impl<
         a: &Integer<T, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
     ) -> Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
         let max_values = self.rns.max_values(Range::Remainder);
-        let a = Integer::new(&a.limbs(), &max_values, a.big(), *a.native());
+        let a = Integer::new(a.limbs(), &max_values, a.big(), *a.native());
         self.reduce(stack, &a);
         a
     }
@@ -321,7 +354,7 @@ impl<
         let limbs: Vec<Witness<N>> = integer
             .limbs()
             .iter()
-            .map(|limb| stack.new_witness(*limb))
+            .map(|limb| stack.new_witness(limb))
             .collect();
 
         let max_values = self.rns.max_values(range);
@@ -329,7 +362,7 @@ impl<
         let terms: Vec<Scaled<N>> = limbs
             .iter()
             .zip(self.rns.left_shifters.iter())
-            .map(|(limb, base)| Scaled::new(limb, *base))
+            .map(|(limb, base)| Scaled::new(limb, base))
             .collect();
         let native = stack.compose(&terms[..], N::ZERO);
 
@@ -348,7 +381,7 @@ impl<
         w1: &Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
     ) {
         w0.limbs().iter().zip(w1.limbs()).for_each(|(w0, w1)| {
-            stack.equal(w0, w1);
+            stack.equal(&w0, w1);
         });
     }
 
@@ -383,7 +416,7 @@ impl<
             .limbs()
             .iter()
             .zip(w1.limbs().iter())
-            .map(|(w0, w1)| stack.select(cond, w0, w1))
+            .map(|(w0, w1)| stack.select(cond, &w0, &w1))
             .collect::<Vec<_>>()
             .try_into()
             .unwrap();
@@ -442,7 +475,7 @@ impl<
         let terms: Vec<Scaled<N>> = limbs
             .iter()
             .zip(self.rns.left_shifters.iter())
-            .map(|(limb, base)| Scaled::new(limb, *base))
+            .map(|(limb, base)| Scaled::new(limb, base))
             .collect();
         let native = stack.compose(&terms[..], N::ZERO);
 

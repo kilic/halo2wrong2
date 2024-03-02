@@ -45,7 +45,7 @@ impl<
                 aux: C::CurveExt,
             ) -> Vec<C::CurveExt> {
                 assert!(size > 0);
-                let mut acc = aux.clone();
+                let mut acc = aux;
                 (0..size)
                     .map(|i| {
                         let ret = acc;
@@ -76,7 +76,7 @@ impl<
         let mut correction = C::CurveExt::identity();
         (0..table.len()).for_each(|_| {
             correction += aux;
-            aux = (0..window_size).fold(aux.clone(), |e, _| e.double());
+            aux = (0..window_size).fold(aux, |e, _| e.double());
         });
 
         let correction = self.register_constant(stack, correction.to_affine().neg());
