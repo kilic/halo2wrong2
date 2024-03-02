@@ -47,7 +47,7 @@ impl<
         // assuming E::Base/E::ScalarExt have the same number of limbs
         let q_x = q.x();
         let q_x_reduced = self.ch_scalar.reduce_external(stack, q_x);
-        self.ch_scalar.copy_equal(stack, &q_x_reduced, &r);
+        self.ch_scalar.copy_equal(stack, &q_x_reduced, r);
     }
 }
 
