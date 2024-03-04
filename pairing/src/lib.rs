@@ -418,28 +418,28 @@ impl<
     }
 
     fn is_one(&self, stack: &mut Stack<N>, f: &Fq12<N, NUMBER_OF_LIMBS, LIMB_SIZE>) -> Witness<N> {
-        let mut acc = self.ch.is_one_strict(stack, &f.c0.c0.c0);
-        let next = self.ch.is_zero_strict(stack, &f.c0.c0.c1);
+        let mut acc = self.ch.is_one(stack, &f.c0.c0.c0);
+        let next = self.ch.is_zero(stack, &f.c0.c0.c1);
         acc = stack.mul(&acc, &next);
-        let next = self.ch.is_zero_strict(stack, &f.c0.c1.c0);
+        let next = self.ch.is_zero(stack, &f.c0.c1.c0);
         acc = stack.mul(&acc, &next);
-        let next = self.ch.is_zero_strict(stack, &f.c0.c1.c1);
+        let next = self.ch.is_zero(stack, &f.c0.c1.c1);
         acc = stack.mul(&acc, &next);
-        let next = self.ch.is_zero_strict(stack, &f.c0.c2.c0);
+        let next = self.ch.is_zero(stack, &f.c0.c2.c0);
         acc = stack.mul(&acc, &next);
-        let next = self.ch.is_zero_strict(stack, &f.c0.c2.c1);
+        let next = self.ch.is_zero(stack, &f.c0.c2.c1);
         acc = stack.mul(&acc, &next);
-        let next = self.ch.is_zero_strict(stack, &f.c1.c0.c0);
+        let next = self.ch.is_zero(stack, &f.c1.c0.c0);
         acc = stack.mul(&acc, &next);
-        let next = self.ch.is_zero_strict(stack, &f.c1.c0.c1);
+        let next = self.ch.is_zero(stack, &f.c1.c0.c1);
         acc = stack.mul(&acc, &next);
-        let next = self.ch.is_zero_strict(stack, &f.c1.c1.c0);
+        let next = self.ch.is_zero(stack, &f.c1.c1.c0);
         acc = stack.mul(&acc, &next);
-        let next = self.ch.is_zero_strict(stack, &f.c1.c1.c1);
+        let next = self.ch.is_zero(stack, &f.c1.c1.c1);
         acc = stack.mul(&acc, &next);
-        let next = self.ch.is_zero_strict(stack, &f.c1.c2.c0);
+        let next = self.ch.is_zero(stack, &f.c1.c2.c0);
         acc = stack.mul(&acc, &next);
-        let next = self.ch.is_zero_strict(stack, &f.c1.c2.c1);
+        let next = self.ch.is_zero(stack, &f.c1.c2.c1);
         acc = stack.mul(&acc, &next);
 
         acc

@@ -1,6 +1,7 @@
 use std::marker::PhantomData;
 
 use circuitry::{
+    chip::first_degree::FirstDegreeChip,
     gates::{range::RangeGate, vanilla::VanillaGate, vertical::VerticalGate},
     stack::Stack,
     utils::{big_to_fe, modulus},
@@ -96,9 +97,20 @@ fn make_stack<
         let zero = ch.rns.zero();
         let zero = ch.range(stack, &zero, Range::Remainder);
         ch.assert_zero(stack, &zero);
-        let zero = ch.rns.modulus();
-        let zero = ch.range(stack, &zero, Range::Remainder);
-        ch.assert_zero(stack, &zero);
+
+        let must_be_one = ch.is_zero(stack, &zero);
+        stack.assert_one(&must_be_one);
+        let must_be_zero = ch.is_one(stack, &zero);
+        stack.assert_zero(&must_be_zero);
+
+        let modulus = ch.rns.modulus();
+        let modulus = ch.range(stack, &modulus, Range::Remainder);
+        ch.assert_zero(stack, &modulus);
+
+        let must_be_one = ch.is_zero(stack, &modulus);
+        stack.assert_one(&must_be_one);
+        let must_be_zero = ch.is_one(stack, &modulus);
+        stack.assert_zero(&must_be_zero);
     }
 
     // reduce & assert

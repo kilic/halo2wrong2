@@ -11,7 +11,6 @@ use crate::{
 };
 
 mod add;
-mod assert_not_zero;
 mod assign;
 mod mul;
 mod reduce;
@@ -222,7 +221,16 @@ impl<
         sign
     }
 
-    pub fn is_zero_strict(
+    pub fn assert_not_zero(
+        &self,
+        stack: &mut Stack<N>,
+        w: &Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
+    ) {
+        let is_zero = self.is_zero(stack, w);
+        stack.assert_zero(&is_zero);
+    }
+
+    pub fn is_zero(
         &self,
         stack: &mut Stack<N>,
         w: &Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
@@ -238,14 +246,13 @@ impl<
         acc.unwrap()
     }
 
-    pub fn is_one_strict(
+    pub fn is_one(
         &self,
         stack: &mut Stack<N>,
         w: &Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
     ) -> Witness<N> {
         let w = self.reduce(stack, w);
         self.assert_in_field(stack, &w);
-        println!("zzz1");
         let mut acc = stack.is_one(w.limb_at(0));
         w.limbs().iter().skip(1).for_each(|limb| {
             let is_zero = stack.is_zero(&limb);
@@ -391,8 +398,8 @@ impl<
         w0: &Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
         w1: &Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
     ) {
-        let must_be_zero = &self.sub(stack, w0, w1);
-        self.assert_zero(stack, must_be_zero)
+        let dif = &self.sub(stack, w0, w1);
+        self.assert_zero(stack, dif)
     }
 
     pub fn assert_not_equal(
@@ -401,8 +408,8 @@ impl<
         w0: &Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
         w1: &Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
     ) {
-        let c = &self.sub(stack, w0, w1);
-        self.assert_not_zero(stack, c)
+        let dif = &self.sub(stack, w0, w1);
+        self.assert_not_zero(stack, dif)
     }
 
     pub fn select(
