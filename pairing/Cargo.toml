@@ -8,7 +8,7 @@ version = "0.2.0"
 
 circuitry = {path = "../circuitry"}
 ecc = {path = "../ecc"}
-halo2 = {package = "halo2_proofs", git = "https://github.com/privacy-scaling-explorations/halo2", features = ["circuit-params"]}
+halo2 = { package = "halo2_proofs", git = "https://github.com/privacy-scaling-explorations/halo2", features = ["circuit-params"], tag = "v0.3.0" }
 integer = {path = "../integer"}
 num-bigint = {version = "0.4", features = ["rand"]}
 num-integer = "0.1"

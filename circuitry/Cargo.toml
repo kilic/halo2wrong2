@@ -8,7 +8,7 @@ version = "0.2.0"
 num-bigint = {version = "0.4", features = ["rand"]}
 num-integer = "0.1"
 num-traits = "0.2"
-halo2 = { package = "halo2_proofs", git = "https://github.com/privacy-scaling-explorations/halo2", features = ["circuit-params"] }
+halo2 = { package = "halo2_proofs", git = "https://github.com/privacy-scaling-explorations/halo2", features = ["circuit-params"], tag = "v0.3.0" }
 # halo2_axiom = {package = "halo2_proofs", path = "../../../axiom-crypto/halo2/halo2_proofs", }
 # halo2 = {package = "halo2_proofs", path = "../../../privacy-scaling-explorations/halo2/halo2_proofs", features = ["circuit-params"]}
 
