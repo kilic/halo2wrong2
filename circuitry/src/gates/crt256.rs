@@ -30,13 +30,13 @@
 //     _marker: PhantomData<(W, N)>,
 // }
 
-// impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const LIMB_SIZE: usize>
-//     CRTGate<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>
+// impl<W: PrimeField, N: PrimeField, >
+//     CRTGate<W, N, >
 // {
 //     pub fn new(
 //         meta: &mut ConstraintSystem<N>,
 //         advice: &[Column<Advice>; NUMBER_OF_LIMBS],
-//     ) -> CRTGate<W, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
+//     ) -> CRTGate<W, N, > {
 //         let mul_selector = meta.selector();
 //         let red_selector = meta.selector();
 //         Self {
@@ -54,7 +54,7 @@
 //         let binary_modulus = &(BigUint::one() << (LIMB_SIZE * NUMBER_OF_LIMBS));
 //         let wrong_modulus = &modulus::<W>();
 //         let negative_wrong_modulus_decomposed =
-//             decompose::<NUMBER_OF_LIMBS, LIMB_SIZE>(&(binary_modulus - wrong_modulus));
+//             decompose::<>(&(binary_modulus - wrong_modulus));
 //         let negative_wrong_modulus_decomposed: [N; NUMBER_OF_LIMBS] =
 //             negative_wrong_modulus_decomposed
 //                 .iter()
@@ -229,8 +229,8 @@
 //     }
 // }
 
-// impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const LIMB_SIZE: usize>
-//     CRTGate<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>
+// impl<W: PrimeField, N: PrimeField, >
+//     CRTGate<W, N, >
 // {
 //     pub fn mul(
 //         &self,

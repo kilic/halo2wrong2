@@ -10,14 +10,9 @@ use group::{Curve, Group};
 use halo2::halo2curves::CurveAffine;
 use integer::integer::Integer;
 
-pub struct FixMul<
-    Emulated: CurveAffine,
-    N: PrimeField + Ord,
-    const NUMBER_OF_LIMBS: usize,
-    const LIMB_SIZE: usize,
-> {
-    pub table: Vec<Vec<Point<Emulated::Base, N, NUMBER_OF_LIMBS, LIMB_SIZE>>>,
-    pub correction: Point<Emulated::Base, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
+pub struct FixMul<Emulated: CurveAffine, N: PrimeField + Ord> {
+    pub table: Vec<Vec<Point<Emulated::Base, N>>>,
+    pub correction: Point<Emulated::Base, N>,
 }
 
 macro_rules! div_ceil {
@@ -26,19 +21,8 @@ macro_rules! div_ceil {
     };
 }
 
-impl<
-        Emulated: CurveAffine,
-        N: PrimeField + Ord,
-        const NUMBER_OF_LIMBS: usize,
-        const LIMB_SIZE: usize,
-        const SUBLIMB_SIZE: usize,
-    > GeneralEccChip<Emulated, N, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE>
-{
-    pub fn prepare_mul_fix(
-        &self,
-        stack: &mut Stack<N>,
-        point: Emulated,
-    ) -> FixMul<Emulated, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
+impl<Emulated: CurveAffine, N: PrimeField + Ord> GeneralEccChip<Emulated, N> {
+    pub fn prepare_mul_fix(&self, stack: &mut Stack<N>, point: Emulated) -> FixMul<Emulated, N> {
         let window_size = 4usize;
 
         pub(crate) fn binary_table<C: CurveAffine>(
@@ -105,9 +89,9 @@ impl<
     pub fn mul_fix(
         &self,
         stack: &mut Stack<N>,
-        prepared: &FixMul<Emulated, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-        scalar: &Integer<Emulated::Scalar, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-    ) -> Point<Emulated::Base, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
+        prepared: &FixMul<Emulated, N>,
+        scalar: &Integer<Emulated::Scalar, N>,
+    ) -> Point<Emulated::Base, N> {
         let window_size = 4;
 
         let scalar = scalar
@@ -115,10 +99,10 @@ impl<
             .iter()
             .enumerate()
             .flat_map(|(i, limb)| {
-                let word_size = if i == NUMBER_OF_LIMBS - 1 {
+                let word_size = if i == self.ch_scalar.rns().number_of_limbs - 1 {
                     self.ch_base.rns().max_most_significant_limb_size
                 } else {
-                    LIMB_SIZE
+                    self.ch_scalar.rns().limb_size
                 };
 
                 let (_scalar, bits) = stack.decompose(limb.value(), word_size, 1);

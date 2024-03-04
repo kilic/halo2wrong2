@@ -17,20 +17,14 @@ use crate::Point;
 
 use super::BaseFieldEccChip;
 
-impl<
-        C: CurveAffine,
-        const NUMBER_OF_LIMBS: usize,
-        const LIMB_SIZE: usize,
-        const SUBLIMB_SIZE: usize,
-    > BaseFieldEccChip<C, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE>
-{
+impl<C: CurveAffine> BaseFieldEccChip<C> {
     pub fn msm_sliding_vertical(
         &self,
         stack: &mut Stack<C::Scalar>,
-        points: &[Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>],
+        points: &[Point<C::Base, C::Scalar>],
         scalars: &[Witness<C::Scalar>],
         window_size: usize,
-    ) -> Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE> {
+    ) -> Point<C::Base, C::Scalar> {
         let number_of_points = points.len();
         assert!(number_of_points > 0);
         assert_eq!(number_of_points, scalars.len());
@@ -110,10 +104,10 @@ impl<
         &self,
         stack: &mut Stack<C::Scalar>,
         tag: C::Scalar,
-        points: &[Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>],
+        points: &[Point<C::Base, C::Scalar>],
         scalars: &[Witness<C::Scalar>],
         window_size: usize,
-    ) -> Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE> {
+    ) -> Point<C::Base, C::Scalar> {
         let number_of_points = points.len();
         assert!(number_of_points > 0);
         assert_eq!(number_of_points, scalars.len());
@@ -219,10 +213,10 @@ impl<
     pub fn msm_sliding_horizontal(
         &self,
         stack: &mut Stack<C::Scalar>,
-        points: &[Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>],
+        points: &[Point<C::Base, C::Scalar>],
         scalars: &[Witness<C::Scalar>],
         window_size: usize,
-    ) -> Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE> {
+    ) -> Point<C::Base, C::Scalar> {
         let number_of_points = points.len();
         assert!(number_of_points > 0);
         assert_eq!(number_of_points, scalars.len());
@@ -232,7 +226,7 @@ impl<
 
         let mut aux_pow2 = self.assign_point(stack, self.witness_aux);
         let mut aux_round_acc = aux_pow2.clone();
-        let tables: Vec<Vec<Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>>> = points
+        let tables: Vec<Vec<Point<C::Base, C::Scalar>>> = points
             .iter()
             .enumerate()
             .map(|(i, point)| {
@@ -300,10 +294,10 @@ impl<
         &self,
         stack: &mut Stack<C::Scalar>,
         tag: C::Scalar,
-        points: &[Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>],
+        points: &[Point<C::Base, C::Scalar>],
         scalars: &[Witness<C::Scalar>],
         window_size: usize,
-    ) -> Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE> {
+    ) -> Point<C::Base, C::Scalar> {
         let number_of_points = points.len();
         assert!(number_of_points > 0);
         assert_eq!(number_of_points, scalars.len());

@@ -4,7 +4,7 @@ use crate::halo2::circuit::Value;
 use ff::PrimeField;
 use num_bigint::BigUint;
 
-use crate::utils::{decompose_into, decompose_into_dyn, fe_to_big};
+use crate::utils::{decompose_into, fe_to_big};
 
 pub trait Composable<F: PrimeField>: Sized {
     type Scaled: Composable<F>;
@@ -189,16 +189,9 @@ impl<F: PrimeField> Witness<F> {
         Scaled::sub(self)
     }
 
-    pub fn decompose<const NUMBER_OF_LIMBS: usize, const LIMB_SIZE: usize>(
-        &self,
-    ) -> Value<[F; NUMBER_OF_LIMBS]> {
+    pub fn decompose(&self, number_of_limbs: usize, limb_size: usize) -> Value<Vec<F>> {
         self.value()
-            .map(|value| decompose_into::<F, F, NUMBER_OF_LIMBS, LIMB_SIZE>(&value))
-    }
-
-    pub fn decompose_generic(&self, number_of_limbs: usize, limb_size: usize) -> Value<Vec<F>> {
-        self.value()
-            .map(|value| decompose_into_dyn(&value, number_of_limbs, limb_size))
+            .map(|value| decompose_into(&value, number_of_limbs, limb_size))
     }
 }
 

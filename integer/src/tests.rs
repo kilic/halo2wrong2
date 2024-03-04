@@ -23,75 +23,89 @@ use crate::{
     rns::Rns,
 };
 
-impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const LIMB_SIZE: usize>
-    Rns<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>
-{
-    pub fn modulus(&self) -> UnassignedInteger<W, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
-        UnassignedInteger::from_big(Value::known(modulus::<W>()))
+impl<W: PrimeField, N: PrimeField> Rns<W, N> {
+    pub fn modulus(&self) -> UnassignedInteger<W, N> {
+        UnassignedInteger::from_big(
+            Value::known(modulus::<W>()),
+            self.number_of_limbs,
+            self.limb_size,
+        )
     }
 
-    pub fn from_fe(&self, e: W) -> UnassignedInteger<W, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
-        UnassignedInteger::from_fe(Value::known(e))
+    pub fn from_fe(&self, e: Value<W>) -> UnassignedInteger<W, N> {
+        UnassignedInteger::from_fe(e, self.number_of_limbs, self.limb_size)
     }
 
-    pub fn from_big(&self, e: BigUint) -> UnassignedInteger<W, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
-        UnassignedInteger::from_big(Value::known(e))
+    pub fn from_big(&self, e: BigUint) -> UnassignedInteger<W, N> {
+        UnassignedInteger::from_big(Value::known(e), self.number_of_limbs, self.limb_size)
     }
 
-    pub fn rand_in_field(&self) -> UnassignedInteger<W, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
-        UnassignedInteger::from_fe(Value::known(W::random(OsRng)))
+    pub fn rand_in_field(&self) -> UnassignedInteger<W, N> {
+        UnassignedInteger::from_fe(
+            Value::known(W::random(OsRng)),
+            self.number_of_limbs,
+            self.limb_size,
+        )
     }
 
-    pub fn rand_in_remainder_range(&self) -> UnassignedInteger<W, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
-        UnassignedInteger::from_big(Value::known(OsRng.gen_biguint(self.max_remainder.bits())))
+    pub fn rand_in_remainder_range(&self) -> UnassignedInteger<W, N> {
+        UnassignedInteger::from_big(
+            Value::known(OsRng.gen_biguint(self.max_remainder.bits())),
+            self.number_of_limbs,
+            self.limb_size,
+        )
     }
 
-    pub fn rand_in_operand_range(&self) -> UnassignedInteger<W, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
-        UnassignedInteger::from_big(Value::known(OsRng.gen_biguint(self.max_operand.bits())))
+    pub fn rand_in_operand_range(&self) -> UnassignedInteger<W, N> {
+        UnassignedInteger::from_big(
+            Value::known(OsRng.gen_biguint(self.max_operand.bits())),
+            self.number_of_limbs,
+            self.limb_size,
+        )
     }
 
-    pub fn rand_in_unreduced_range(&self) -> UnassignedInteger<W, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
+    pub fn rand_in_unreduced_range(&self) -> UnassignedInteger<W, N> {
         self.rand_with_limb_bit_size(self._max_unreduced_limb.bits() as usize)
     }
 
-    pub fn rand_with_limb_bit_size(
-        &self,
-        bit_len: usize,
-    ) -> UnassignedInteger<W, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
-        let limbs = (0..NUMBER_OF_LIMBS)
+    pub fn rand_with_limb_bit_size(&self, bit_len: usize) -> UnassignedInteger<W, N> {
+        let limbs = (0..self.number_of_limbs)
             .map(|_| {
                 let e = &OsRng.gen_biguint(bit_len as u64);
                 big_to_fe(e)
             })
             .collect::<Vec<N>>();
-        UnassignedInteger::from_limbs(Value::known(limbs.try_into().unwrap()))
+        UnassignedInteger::from_limbs(Value::known(limbs), self.number_of_limbs, self.limb_size)
     }
 
-    pub fn rand_constant(&self) -> ConstantInteger<W, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
-        ConstantInteger::from_fe(&W::random(OsRng))
+    pub fn rand_constant(&self) -> ConstantInteger<W, N> {
+        ConstantInteger::from_fe(&W::random(OsRng), self.number_of_limbs, self.limb_size)
     }
 
-    pub fn zero(&self) -> UnassignedInteger<W, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
-        UnassignedInteger::from_big(Value::known(BigUint::zero()))
+    pub fn zero(&self) -> UnassignedInteger<W, N> {
+        UnassignedInteger::from_big(
+            Value::known(BigUint::zero()),
+            self.number_of_limbs,
+            self.limb_size,
+        )
     }
 
-    pub fn one(&self) -> UnassignedInteger<W, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
-        UnassignedInteger::from_big(Value::known(BigUint::one()))
+    pub fn one(&self) -> UnassignedInteger<W, N> {
+        UnassignedInteger::from_big(
+            Value::known(BigUint::one()),
+            self.number_of_limbs,
+            self.limb_size,
+        )
     }
 }
 
-fn make_stack<
-    W: PrimeField,
-    N: PrimeField + Ord,
-    const NUMBER_OF_LIMBS: usize,
-    const LIMB_SIZE: usize,
-    const SUBLIMB_SIZE: usize,
->(
-    rns: &Rns<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
+fn make_stack<W: PrimeField, N: PrimeField + Ord>(
+    rns: &Rns<W, N>,
+    sublimb_size: usize,
 ) -> Stack<N> {
     let stack = &mut Stack::default();
 
-    let ch: IntegerChip<W, N, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE> = IntegerChip::new(rns);
+    let ch: IntegerChip<W, N> = IntegerChip::new(rns, sublimb_size);
 
     {
         let zero = ch.rns.zero();
@@ -158,7 +172,7 @@ fn make_stack<
         let a1 = ch.reduce(stack, &a0);
         ch.normal_equal(stack, &a0, &a1);
 
-        let a0 = ch.rns.rand_with_limb_bit_size(LIMB_SIZE * 3 / 2);
+        let a0 = ch.rns.rand_with_limb_bit_size(rns.limb_size * 3 / 2);
         let a0 = ch.assign(stack, a0, Range::Unreduced);
         ch.assert_not_zero(stack, &a0);
         let a1 = ch.reduce(stack, &a0);
@@ -223,7 +237,7 @@ fn make_stack<
         let a0 = &ch.range(stack, &a0, Range::Remainder);
         let a1 = &ch.range(stack, &a1, Range::Remainder);
         let res = a0.value().zip(a1.value()).map(|(a0, a1)| a0 * a1);
-        let u0 = UnassignedInteger::from_fe(res);
+        let u0 = rns.from_fe(res);
         let u0 = ch.range(stack, &u0, Range::Remainder);
         let u1 = ch.mul(stack, a0, a1, &[]);
         ch.copy_equal(stack, &u0, &u1);
@@ -245,7 +259,7 @@ fn make_stack<
             .zip(a1.value())
             .zip(to_sub.value())
             .map(|((a0, a1), to_sub)| a0 * a1 - to_sub);
-        let u0 = UnassignedInteger::from_fe(res);
+        let u0 = rns.from_fe(res);
         let u0 = ch.range(stack, &u0, Range::Remainder);
         let to_sub = ch.neg(stack, &to_sub);
 
@@ -262,7 +276,7 @@ fn make_stack<
         let a0 = ch.rns.rand_in_field();
         let a0 = &ch.range(stack, &a0, Range::Remainder);
         let res = a0.value().map(|a0| (a0 * a0));
-        let u0 = UnassignedInteger::from_fe(res);
+        let u0 = rns.from_fe(res);
         let u0 = ch.range(stack, &u0, Range::Remainder);
         let u1 = ch.square(stack, a0, &[]);
 
@@ -281,7 +295,7 @@ fn make_stack<
             .value()
             .zip(to_sub.value())
             .map(|(a0, to_sub)| a0 * a0 - to_sub);
-        let u0 = UnassignedInteger::from_fe(res);
+        let u0 = rns.from_fe(res);
         let u0 = ch.range(stack, &u0, Range::Remainder);
         let to_sub = ch.neg(stack, &to_sub);
         let u1 = ch.square(stack, a0, &[&to_sub]);
@@ -306,7 +320,7 @@ fn make_stack<
                 .value()
                 .zip(a1.value())
                 .map(|(a0, a1)| a0 * a1.invert().unwrap());
-            let u0 = UnassignedInteger::from_fe(res);
+            let u0 = rns.from_fe(res);
             let u0 = ch.range(stack, &u0, Range::Remainder);
             let u1 = ch.div(stack, a0, a1);
             ch.copy_equal(stack, &u0, &u1);
@@ -334,7 +348,7 @@ fn make_stack<
                 (a0 * a1 + to_add) * divisor.invert().unwrap().neg()
             });
 
-        let u0 = UnassignedInteger::from_fe(res);
+        let u0 = rns.from_fe(res);
         let u0 = ch.range(stack, &u0, Range::Remainder);
 
         u1.value()
@@ -354,44 +368,34 @@ fn make_stack<
 }
 
 #[derive(Clone)]
-struct TestConfig<
-    N: PrimeField + Ord,
-    const RANGE_W: usize,
-    const NUMBER_OF_LIMBS: usize,
-    const LIMB_SIZE: usize,
-    const SUBLIMB_SIZE: usize,
-> {
+struct TestConfig<N: PrimeField + Ord, const RANGE_W: usize> {
     vertical_gate: VerticalGate<RANGE_W>,
     vanilla_gate: VanillaGate,
     range_gate: RangeGate,
     stack: Stack<N>,
 }
 
+#[derive(Default, Clone)]
+struct Params {
+    limb_size: usize,
+    sublimb_size: usize,
+}
+
 #[derive(Clone, Default)]
-struct TestCircuit<
-    W: PrimeField,
-    N: PrimeField + Ord,
-    const RANGE_W: usize,
-    const NUMBER_OF_LIMBS: usize,
-    const LIMB_SIZE: usize,
-    const SUBLIMB_SIZE: usize,
->(PhantomData<(N, W)>);
+struct TestCircuit<W: PrimeField, N: PrimeField + Ord, const RANGE_W: usize> {
+    params: Params,
+    _marker: PhantomData<(N, W)>,
+}
 
-impl<
-        W: PrimeField,
-        N: PrimeField + Ord,
-        const RANGE_W: usize,
-        const NUMBER_OF_LIMBS: usize,
-        const LIMB_SIZE: usize,
-        const SUBLIMB_SIZE: usize,
-    > Circuit<N> for TestCircuit<W, N, RANGE_W, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE>
+impl<W: PrimeField, N: PrimeField + Ord, const RANGE_W: usize> Circuit<N>
+    for TestCircuit<W, N, RANGE_W>
 {
-    type Config = TestConfig<N, RANGE_W, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE>;
+    type Config = TestConfig<N, RANGE_W>;
     type FloorPlanner = SimpleFloorPlanner;
-    type Params = ();
+    type Params = Params;
 
-    fn configure(meta: &mut ConstraintSystem<N>) -> Self::Config {
-        let rns = Rns::construct();
+    fn configure_with_params(meta: &mut ConstraintSystem<N>, params: Self::Params) -> Self::Config {
+        let rns = Rns::construct(params.limb_size);
 
         let advices = (0..RANGE_W)
             .map(|_| meta.advice_column())
@@ -399,7 +403,7 @@ impl<
         let range_gate = RangeGate::configure(meta, &advices);
         let vertical_gate = VerticalGate::configure(meta, &range_gate, advices.try_into().unwrap());
         let vanilla_gate = VanillaGate::configure(meta);
-        let stack = make_stack::<W, N, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE>(&rns);
+        let stack = make_stack::<W, N>(&rns, params.sublimb_size);
 
         Self::Config {
             stack,
@@ -407,6 +411,10 @@ impl<
             vertical_gate,
             vanilla_gate,
         }
+    }
+
+    fn configure(_meta: &mut ConstraintSystem<N>) -> Self::Config {
+        unreachable!();
     }
 
     fn without_witnesses(&self) -> Self {
@@ -425,22 +433,25 @@ impl<
 
         Ok(())
     }
+
+    fn params(&self) -> Self::Params {
+        self.params.clone()
+    }
 }
 
-fn run_test<
-    W: PrimeField,
-    N: Ord + FromUniformBytes<64>,
-    const RANGE_W: usize,
-    const NUMBER_OF_LIMBS: usize,
-    const LIMB_SIZE: usize,
-    const SUBLIMB_SIZE: usize,
->(
-    k: u32,
+fn run_test<W: PrimeField, N: Ord + FromUniformBytes<64>, const RANGE_W: usize>(
+    limb_size: usize,
+    sublimb_size: usize,
 ) {
-    let circuit =
-        TestCircuit::<W, N, RANGE_W, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE>(PhantomData);
+    let circuit = TestCircuit::<W, N, RANGE_W> {
+        params: Params {
+            limb_size,
+            sublimb_size,
+        },
+        _marker: PhantomData,
+    };
     let public_inputs = vec![];
-    let prover = match MockProver::run(k, &circuit, public_inputs) {
+    let prover = match MockProver::run(sublimb_size as u32 + 1, &circuit, public_inputs) {
         Ok(prover) => prover,
         Err(e) => panic!("{e:#}"),
     };
@@ -451,12 +462,7 @@ fn run_test<
 fn test_integer() {
     use halo2::halo2curves::pasta::{Fp as PastaFp, Fq as PastaFq};
 
-    run_test::<
-        PastaFp,
-        PastaFq,
-        2,  // range gate width
-        3,  // number of limbs
-        90, // limb size
-        18, // sub limb size
-    >(19);
+    let limb_size = 90;
+    let sublimb_size = 18;
+    run_test::<PastaFp, PastaFq, 2>(limb_size, sublimb_size);
 }

@@ -3,7 +3,7 @@ use ff::PrimeField;
 use halo2::{circuit::Value, halo2curves::CurveAffine};
 use integer::{
     chip::IntegerChip,
-    integer::{ConstantInteger, Integer, Range, UnassignedInteger},
+    integer::{ConstantInteger, Integer, Range},
     rns::Rns,
 };
 
@@ -15,42 +15,28 @@ pub mod mul_var;
 mod test;
 
 #[derive(Debug, Clone)]
-pub struct BaseFieldEccChip<
-    C: CurveAffine,
-    const NUMBER_OF_LIMBS: usize,
-    const LIMB_SIZE: usize,
-    const SUBLIMB_SIZE: usize,
-> {
-    pub ch: IntegerChip<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE>,
+pub struct BaseFieldEccChip<C: CurveAffine> {
+    pub ch: IntegerChip<C::Base, C::Scalar>,
     witness_aux: Value<C>,
     constant_aux: C,
-    b: ConstantInteger<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>,
+    b: ConstantInteger<C::Base, C::Scalar>,
 }
 
-impl<
-        C: CurveAffine,
-        const NUMBER_OF_LIMBS: usize,
-        const LIMB_SIZE: usize,
-        const SUBLIMB_SIZE: usize,
-    > BaseFieldEccChip<C, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE>
-{
+impl<C: CurveAffine> BaseFieldEccChip<C> {
     pub fn new(
-        rns: &Rns<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>,
+        rns: &Rns<C::Base, C::Scalar>,
         witness_aux: Value<C>,
         constant_aux: C,
+        sublimb_size: usize,
     ) -> Self {
-        let ch = IntegerChip::new(rns);
-        let b = Self::parameter_b();
+        let ch = IntegerChip::new(rns, sublimb_size);
+        let b = rns.constant(&C::b());
         Self {
             witness_aux,
             constant_aux,
             b,
             ch,
         }
-    }
-
-    fn parameter_b() -> ConstantInteger<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE> {
-        ConstantInteger::from_fe(&C::b())
     }
 
     pub fn assign_scalar(
@@ -65,7 +51,7 @@ impl<
         &self,
         stack: &mut Stack<C::Scalar>,
         point: C,
-    ) -> Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE> {
+    ) -> Point<C::Base, C::Scalar> {
         let coords = point.coordinates();
         // disallow point of infinity
         // it will not pass assing point enforcement
@@ -81,7 +67,7 @@ impl<
         &self,
         stack: &mut Stack<C::Scalar>,
         point: Value<C>,
-    ) -> Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE> {
+    ) -> Point<C::Base, C::Scalar> {
         let (x, y) = point
             .map(|point| {
                 let coords = point.coordinates();
@@ -96,10 +82,10 @@ impl<
 
         let x = &self
             .ch
-            .range(stack, &UnassignedInteger::from_fe(x), Range::Remainder);
+            .range(stack, &self.ch.rns().unassigned(x), Range::Remainder);
         let y = &self
             .ch
-            .range(stack, &UnassignedInteger::from_fe(y), Range::Remainder);
+            .range(stack, &self.ch.rns().unassigned(y), Range::Remainder);
 
         let point = Point::new(x, y);
         self.assert_on_curve(stack, &point);
@@ -113,7 +99,7 @@ impl<
         tag: C::Scalar,
         address: C::Scalar,
         y_offset: usize,
-        point: &Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>,
+        point: &Point<C::Base, C::Scalar>,
     ) {
         let y_offset = C::Scalar::from(y_offset as u64);
         // println!("x: {:?}", address);
@@ -130,7 +116,7 @@ impl<
         address_base: C::Scalar,
         address_fraction: &Witness<C::Scalar>,
         y_offset: usize,
-    ) -> Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE> {
+    ) -> Point<C::Base, C::Scalar> {
         let y_offset = C::Scalar::from(y_offset as u64);
 
         let x = &self
@@ -149,11 +135,7 @@ impl<
         Point::new(x, y)
     }
 
-    pub fn assert_on_curve(
-        &self,
-        stack: &mut Stack<C::Scalar>,
-        point: &Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>,
-    ) {
+    pub fn assert_on_curve(&self, stack: &mut Stack<C::Scalar>, point: &Point<C::Base, C::Scalar>) {
         let y_square = &self.ch.square(stack, point.y(), &[]);
         let x_square = &self.ch.square(stack, point.x(), &[]);
         let x_cube = &self.ch.mul(stack, point.x(), x_square, &[]);
@@ -164,8 +146,8 @@ impl<
     pub fn copy_equal(
         &self,
         stack: &mut Stack<C::Scalar>,
-        p0: &Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>,
-        p1: &Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>,
+        p0: &Point<C::Base, C::Scalar>,
+        p1: &Point<C::Base, C::Scalar>,
     ) {
         self.ch.copy_equal(stack, p0.x(), p1.x());
         self.ch.copy_equal(stack, p0.y(), p1.y());
@@ -174,8 +156,8 @@ impl<
     pub fn normal_equal(
         &self,
         stack: &mut Stack<C::Scalar>,
-        p0: &Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>,
-        p1: &Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>,
+        p0: &Point<C::Base, C::Scalar>,
+        p1: &Point<C::Base, C::Scalar>,
     ) {
         // TODO: consider using normalize
         self.ch.normal_equal(stack, p0.x(), p1.x());
@@ -185,8 +167,8 @@ impl<
     pub fn normalize(
         &self,
         stack: &mut Stack<C::Scalar>,
-        point: &Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>,
-    ) -> Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE> {
+        point: &Point<C::Base, C::Scalar>,
+    ) -> Point<C::Base, C::Scalar> {
         let x = &self.ch.reduce(stack, point.x());
         let y = &self.ch.reduce(stack, point.y());
         Point::new(x, y)
@@ -196,9 +178,9 @@ impl<
         &self,
         stack: &mut Stack<C::Scalar>,
         c: &Witness<C::Scalar>,
-        p1: &Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>,
-        p2: &Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>,
-    ) -> Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE> {
+        p1: &Point<C::Base, C::Scalar>,
+        p2: &Point<C::Base, C::Scalar>,
+    ) -> Point<C::Base, C::Scalar> {
         let x = &self.ch.select(stack, p1.x(), p2.x(), c);
         let y = &self.ch.select(stack, p1.y(), p2.y(), c);
         Point::new(x, y)
@@ -208,8 +190,8 @@ impl<
         &self,
         stack: &mut Stack<C::Scalar>,
         selector: &[Witness<C::Scalar>],
-        table: &[Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>],
-    ) -> Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE> {
+        table: &[Point<C::Base, C::Scalar>],
+    ) -> Point<C::Base, C::Scalar> {
         let number_of_selectors = selector.len();
         let mut reducer = table.to_vec();
         for (i, selector) in selector.iter().enumerate() {
@@ -225,9 +207,9 @@ impl<
     pub fn add_incomplete(
         &self,
         stack: &mut Stack<C::Scalar>,
-        a: &Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>,
-        b: &Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>,
-    ) -> Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE> {
+        a: &Point<C::Base, C::Scalar>,
+        b: &Point<C::Base, C::Scalar>,
+    ) -> Point<C::Base, C::Scalar> {
         // lambda = b_y - a_y / b_x - a_x
         let numer = &self.ch.sub(stack, &b.y, &a.y);
         let denom = &self.ch.sub(stack, &b.x, &a.x);
@@ -247,9 +229,9 @@ impl<
     pub fn sub_incomplete(
         &self,
         stack: &mut Stack<C::Scalar>,
-        a: &Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>,
-        b: &Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>,
-    ) -> Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE> {
+        a: &Point<C::Base, C::Scalar>,
+        b: &Point<C::Base, C::Scalar>,
+    ) -> Point<C::Base, C::Scalar> {
         // lambda = b_y + a_y / a_x - b_x
         let numer = &self.ch.add(stack, &b.y, &a.y);
         let denom = &self.ch.sub(stack, &a.x, &b.x);
@@ -270,8 +252,8 @@ impl<
     pub fn double_incomplete(
         &self,
         stack: &mut Stack<C::Scalar>,
-        point: &Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>,
-    ) -> Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE> {
+        point: &Point<C::Base, C::Scalar>,
+    ) -> Point<C::Base, C::Scalar> {
         // lambda = (3 * a_x^2) / 2 * a_y
         let x_0_square = &self.ch.square(stack, &point.x, &[]);
         let numer = &self.ch.mul3(stack, x_0_square);
@@ -310,23 +292,18 @@ impl<
     pub fn add_multi(
         &self,
         stack: &mut Stack<C::Scalar>,
-        points: &[Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>],
-    ) -> Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE> {
+        points: &[Point<C::Base, C::Scalar>],
+    ) -> Point<C::Base, C::Scalar> {
         assert!(!points.is_empty());
         if points.len() == 1 {
             return points[0].clone();
         }
 
-        struct State<
-            W: PrimeField,
-            N: PrimeField,
-            const NUMBER_OF_LIMBS: usize,
-            const LIMB_SIZE: usize,
-        > {
-            x_prev: Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-            y_prev: Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-            x_cur: Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-            lambda: Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
+        struct State<W: PrimeField, N: PrimeField> {
+            x_prev: Integer<W, N>,
+            y_prev: Integer<W, N>,
+            x_cur: Integer<W, N>,
+            lambda: Integer<W, N>,
         }
 
         let p0 = &points[0];
@@ -370,9 +347,9 @@ impl<
     //     &self,
     //     stack: &mut Stack,
 
-    //     to_double: &Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>,
-    //     to_add: &Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>,
-    // ) -> Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE> {
+    //     to_double: &Point<C::Base, C::Scalar, >,
+    //     to_add: &Point<C::Base, C::Scalar, >,
+    // ) -> Point<C::Base, C::Scalar, > {
     //     // (P + Q) + P
     //     // P is to_double (x_1, y_1)
     //     // Q is to_add (x_2, y_2)

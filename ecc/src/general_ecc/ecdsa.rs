@@ -7,22 +7,15 @@ use crate::Point;
 
 use super::{mul_fix::FixMul, GeneralEccChip};
 
-impl<
-        Emulated: CurveAffine,
-        N: PrimeField + Ord,
-        const NUMBER_OF_LIMBS: usize,
-        const LIMB_SIZE: usize,
-        const SUBLIMB_SIZE: usize,
-    > GeneralEccChip<Emulated, N, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE>
-{
+impl<Emulated: CurveAffine, N: PrimeField + Ord> GeneralEccChip<Emulated, N> {
     pub fn verify_ecdsa(
         &self,
         stack: &mut Stack<N>,
-        prepared: &FixMul<Emulated, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-        pub_key: &Point<Emulated::Base, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-        message: &Integer<Emulated::Scalar, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-        r: &Integer<Emulated::Scalar, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-        s: &Integer<Emulated::Scalar, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
+        prepared: &FixMul<Emulated, N>,
+        pub_key: &Point<Emulated::Base, N>,
+        message: &Integer<Emulated::Scalar, N>,
+        r: &Integer<Emulated::Scalar, N>,
+        s: &Integer<Emulated::Scalar, N>,
     ) {
         // 1. check 0 < r, s < n
 
@@ -41,12 +34,15 @@ impl<
         // 5. compute Q = u1*G + u2*pk
         let u1_g = self.mul_fix(stack, prepared, &u1);
         let u2_pk = self.msm_sliding_horizontal(stack, &[pub_key.clone()], &[u2], 4);
+
         let q = self.add_incomplete(stack, &u1_g, &u2_pk);
 
         // 6. reduce q_x in E::ScalarExt
         // assuming E::Base/E::ScalarExt have the same number of limbs
         let q_x = q.x();
+
         let q_x_reduced = self.ch_scalar.reduce_external(stack, q_x);
+
         self.ch_scalar.copy_equal(stack, &q_x_reduced, r);
     }
 }
@@ -73,7 +69,7 @@ mod test {
 
     use halo2::halo2curves::pasta::EqAffine;
     use halo2::halo2curves::CurveExt;
-    use halo2::plonk::{Advice, Column};
+    use halo2::plonk::Column;
     use halo2::{
         circuit::{Layouter, SimpleFloorPlanner, Value},
         dev::MockProver,
@@ -96,26 +92,28 @@ mod test {
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn make_stack<
-        Emulated: CurveAffine,
-        N: PrimeField + Ord,
-        const NUMBER_OF_LIMBS: usize,
-        const LIMB_SIZE: usize,
-        const SUBLIMB_SIZE: usize,
-    >(
-        rns_base: &Rns<Emulated::Base, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-        rns_scalar: &Rns<Emulated::Scalar, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
+    fn make_stack<Emulated: CurveAffine, N: PrimeField + Ord>(
+        rns_base: &Rns<Emulated::Base, N>,
+        rns_scalar: &Rns<Emulated::Scalar, N>,
         witness_aux: Value<Emulated>,
         constant_aux: Emulated,
         pub_key: Value<Emulated>,
         message: Value<Emulated::Scalar>,
         r: Value<Emulated::Scalar>,
         s: Value<Emulated::Scalar>,
+        sublimb_size: usize,
     ) -> Stack<N> {
-        let stack = &mut Stack::<N>::with_rom(NUMBER_OF_LIMBS);
+        assert_eq!(rns_base.number_of_limbs, rns_scalar.number_of_limbs);
+        let number_of_limbs = rns_base.number_of_limbs;
+        let stack = &mut Stack::<N>::with_rom(number_of_limbs);
 
-        let ecc_ch: GeneralEccChip<Emulated, N, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE> =
-            GeneralEccChip::new(rns_base, rns_scalar, witness_aux, constant_aux);
+        let ecc_ch: GeneralEccChip<Emulated, N> = GeneralEccChip::new(
+            rns_base,
+            rns_scalar,
+            witness_aux,
+            constant_aux,
+            sublimb_size,
+        );
 
         let g = Emulated::generator();
         let g_prepared = ecc_ch.prepare_mul_fix(stack, g);
@@ -131,14 +129,7 @@ mod test {
     }
 
     #[derive(Clone)]
-    struct TestConfig<
-        Emulated: CurveAffine,
-        N: PrimeField + Ord,
-        const RANGE_W: usize,
-        const NUMBER_OF_LIMBS: usize,
-        const LIMB_SIZE: usize,
-        const SUBLIMB_SIZE: usize,
-    > {
+    struct TestConfig<Emulated: CurveAffine, N: PrimeField + Ord, const RANGE_W: usize> {
         vertical_gate: VerticalGate<RANGE_W>,
         vanilla_gate: VanillaGate,
         range_gate: RangeGate,
@@ -155,32 +146,20 @@ mod test {
         message: Value<Emulated::Scalar>,
         r: Value<Emulated::Scalar>,
         s: Value<Emulated::Scalar>,
+        limb_size: usize,
+        sublimb_size: usize,
     }
 
     #[derive(Default)]
-    struct TestCircuit<
-        Emulated: CurveAffine,
-        N: PrimeField + Ord,
-        const RANGE_W: usize,
-        const NUMBER_OF_LIMBS: usize,
-        const LIMB_SIZE: usize,
-        const SUBLIMB_SIZE: usize,
-    > {
+    struct TestCircuit<Emulated: CurveAffine, N: PrimeField + Ord, const RANGE_W: usize> {
         params: Params<Emulated>,
         _marker: std::marker::PhantomData<N>,
     }
 
-    impl<
-            Emulated: CurveAffine,
-            N: PrimeField + Ord,
-            const RANGE_W: usize,
-            const NUMBER_OF_LIMBS: usize,
-            const LIMB_SIZE: usize,
-            const SUBLIMB_SIZE: usize,
-        > Circuit<N>
-        for TestCircuit<Emulated, N, RANGE_W, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE>
+    impl<Emulated: CurveAffine, N: PrimeField + Ord, const RANGE_W: usize> Circuit<N>
+        for TestCircuit<Emulated, N, RANGE_W>
     {
-        type Config = TestConfig<Emulated, N, RANGE_W, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE>;
+        type Config = TestConfig<Emulated, N, RANGE_W>;
         type FloorPlanner = SimpleFloorPlanner;
         type Params = Params<Emulated>;
 
@@ -197,9 +176,13 @@ mod test {
                 VerticalGate::configure(meta, &range_gate, advices.try_into().unwrap());
             let vanilla_gate = VanillaGate::configure(meta);
 
+            let rns_base = Rns::construct(params.limb_size);
+            let rns_scalar = Rns::construct(params.limb_size);
+            assert_eq!(rns_base.number_of_limbs, rns_scalar.number_of_limbs);
+            let number_of_limbs = rns_base.number_of_limbs;
+
             let shared_columns = vanilla_gate.advice_colums();
-            let rom_value_columns: [Column<Advice>; NUMBER_OF_LIMBS] =
-                shared_columns[0..NUMBER_OF_LIMBS].try_into().unwrap();
+            let rom_value_columns: Vec<Column<_>> = shared_columns[0..number_of_limbs].to_vec();
             let query_fraction = vertical_gate.advice_columns()[0];
 
             let rom_gate = ROMGate::configure(
@@ -209,11 +192,8 @@ mod test {
                 &rom_value_columns[..],
             );
 
-            let rns_base = Rns::construct();
-            let rns_scalar = Rns::construct();
-
             let t0 = start_timer!(|| "witness gen");
-            let stack = make_stack::<Emulated, N, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE>(
+            let stack = make_stack::<Emulated, N>(
                 &rns_base,
                 &rns_scalar,
                 params.witness_aux,
@@ -222,6 +202,7 @@ mod test {
                 params.message,
                 params.r,
                 params.s,
+                params.sublimb_size,
             );
             end_timer!(t0);
 
@@ -269,15 +250,10 @@ mod test {
         }
     }
 
-    fn run_test<
-        Emulated: CurveAffine,
-        N: PrimeField + Ord,
-        const RANGE_W: usize,
-        const NUMBER_OF_LIMBS: usize,
-        const LIMB_SIZE: usize,
-        const SUBLIMB_SIZE: usize,
-    >()
-    where
+    fn run_test<Emulated: CurveAffine, N: PrimeField + Ord, const RANGE_W: usize>(
+        limb_size: usize,
+        sublimb_size: usize,
+    ) where
         N: FromUniformBytes<64>,
     {
         // Generate a key pair
@@ -323,13 +299,15 @@ mod test {
             r: Value::known(r),
             s: Value::known(s),
             message: Value::known(message),
+            limb_size,
+            sublimb_size,
         };
-        let circuit = TestCircuit::<Emulated, N, RANGE_W, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE> {
+        let circuit = TestCircuit::<Emulated, N, RANGE_W> {
             params,
             _marker: std::marker::PhantomData,
         };
         let public_inputs = vec![];
-        let prover = match MockProver::run(SUBLIMB_SIZE as u32 + 1, &circuit, public_inputs) {
+        let prover = match MockProver::run(sublimb_size as u32 + 1, &circuit, public_inputs) {
             Ok(prover) => prover,
             Err(e) => panic!("{e:#}"),
         };
@@ -338,13 +316,8 @@ mod test {
 
     #[test]
     fn test_ecdsa() {
-        run_test::<
-            EqAffine,
-            Fr,
-            2,
-            3,  // number of limbs
-            90, // limb size
-            18, // sublimb size
-        >();
+        let limb_size = 90;
+        let sublimb_size = 18;
+        run_test::<EqAffine, Fr, 2>(limb_size, sublimb_size);
     }
 }

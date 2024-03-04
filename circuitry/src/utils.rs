@@ -46,51 +46,22 @@ fn fe_to_fe_unsafe<W: PrimeField, N: PrimeField>(input: &N) -> W {
     W::from_repr(repr).unwrap()
 }
 
-pub fn compose<const NUMBER_OF_LIMBS: usize, const LIMB_SIZE: usize>(
-    input: &[BigUint; NUMBER_OF_LIMBS],
-) -> BigUint {
-    input
-        .iter()
-        .rev()
-        .fold(BigUint::zero(), |acc, val| (acc << LIMB_SIZE) + val)
-}
-
-pub fn compose_dyn(input: Vec<BigUint>, limb_size: usize) -> BigUint {
+pub fn compose(input: &[BigUint], limb_size: usize) -> BigUint {
     input
         .iter()
         .rev()
         .fold(BigUint::zero(), |acc, val| (acc << limb_size) + val)
 }
 
-pub fn compose_into<
-    W: PrimeField,
-    N: PrimeField,
-    const NUMBER_OF_LIMBS: usize,
-    const LIMB_SIZE: usize,
->(
-    input: &[N; NUMBER_OF_LIMBS],
-) -> W {
-    let shifter = BigUint::one() << LIMB_SIZE;
+pub fn compose_into<W: PrimeField, N: PrimeField>(input: &[N], limb_size: usize) -> W {
+    let shifter = BigUint::one() << limb_size;
     let shifter: W = big_to_fe_unsafe(&shifter);
     input.iter().rev().fold(W::ZERO, |acc, val| {
         (acc * shifter) + fe_to_fe_unsafe::<W, N>(val)
     })
 }
 
-pub fn decompose<const NUMBER_OF_LIMBS: usize, const LIMB_SIZE: usize>(
-    e: &BigUint,
-) -> [BigUint; NUMBER_OF_LIMBS] {
-    let mask = &(BigUint::one().shl(LIMB_SIZE) - 1usize);
-    (0usize..)
-        .step_by(LIMB_SIZE)
-        .take(NUMBER_OF_LIMBS)
-        .map(|shift| ((e >> shift) & mask))
-        .collect::<Vec<_>>()
-        .try_into()
-        .unwrap()
-}
-
-pub fn decompose_dyn(e: &BigUint, number_of_limbs: usize, limb_size: usize) -> Vec<BigUint> {
+pub fn decompose(e: &BigUint, number_of_limbs: usize, limb_size: usize) -> Vec<BigUint> {
     let mask = &(BigUint::one().shl(limb_size) - 1usize);
     (0usize..)
         .step_by(limb_size)
@@ -99,137 +70,49 @@ pub fn decompose_dyn(e: &BigUint, number_of_limbs: usize, limb_size: usize) -> V
         .collect::<Vec<_>>()
 }
 
-pub fn decompose_into<
-    W: PrimeField,
-    N: PrimeField,
-    const NUMBER_OF_LIMBS: usize,
-    const LIMB_SIZE: usize,
->(
-    e: &W,
-) -> [N; NUMBER_OF_LIMBS] {
-    let big = &fe_to_big(e);
-    decompose::<NUMBER_OF_LIMBS, LIMB_SIZE>(big)
-        .iter()
-        .map(|x| big_to_fe_unsafe(x))
-        .collect::<Vec<_>>()
-        .try_into()
-        .unwrap()
-}
-
-pub fn decompose_into_dyn<W: PrimeField, N: PrimeField>(
+pub fn decompose_into<W: PrimeField, N: PrimeField>(
     e: &W,
     number_of_limbs: usize,
     limb_size: usize,
 ) -> Vec<N> {
     let big = &fe_to_big(e);
-    decompose_dyn(big, number_of_limbs, limb_size)
+    decompose(big, number_of_limbs, limb_size)
         .iter()
         .map(big_to_fe)
         .collect::<Vec<_>>()
 }
 
-fn get_bits_128(segment: usize, window: usize, bytes: &[u8]) -> u128 {
-    let skip_bits = segment * window;
-    let skip_bytes = skip_bits / 8;
-    let mut v = [0; 16];
-    for (v, o) in v.iter_mut().zip(bytes[skip_bytes..].iter()) {
-        *v = *o;
-    }
-    (u128::from_le_bytes(v) << (skip_bits - (skip_bytes * 8))) & ((1 << window) - 1)
-}
-
-pub fn decompose_127_into<
-    W: PrimeField,
-    N: PrimeField,
-    const NUMBER_OF_LIMBS: usize,
-    const LIMB_SIZE: usize,
->(
-    e: &W,
-) -> [N; NUMBER_OF_LIMBS] {
-    #[cfg(feature = "sanity-checks")]
-    {
-        assert!(LIMB_SIZE <= 127);
-    }
-    let repr = e.to_repr();
-    (0..NUMBER_OF_LIMBS)
-        .map(|i| {
-            let u = get_bits_128(i, LIMB_SIZE, repr.as_ref());
-            N::from_u128(u)
-        })
-        .collect::<Vec<_>>()
-        .try_into()
-        .unwrap()
-}
-
-fn get_bits_64(segment: usize, window: usize, bytes: &[u8]) -> u64 {
-    let skip_bits = segment * window;
-    let skip_bytes = skip_bits / 8;
-    let mut v = [0; 8];
-    for (v, o) in v.iter_mut().zip(bytes[skip_bytes..].iter()) {
-        *v = *o;
-    }
-    (u64::from_le_bytes(v) << (skip_bits - (skip_bytes * 8))) & ((1 << window) - 1)
-}
-
-pub fn decompose_63_into<
-    W: PrimeField,
-    N: PrimeField,
-    const NUMBER_OF_LIMBS: usize,
-    const LIMB_SIZE: usize,
->(
-    e: &W,
-) -> [N; NUMBER_OF_LIMBS] {
-    #[cfg(feature = "sanity-checks")]
-    {
-        assert!(LIMB_SIZE <= 63);
-    }
-    let repr = e.to_repr();
-    (0..NUMBER_OF_LIMBS)
-        .map(|i| get_bits_64(i, LIMB_SIZE, repr.as_ref()).into())
-        .collect::<Vec<_>>()
-        .try_into()
-        .unwrap()
-}
-
 #[cfg(test)]
 mod test {
+
+    use super::{decompose, decompose_into, fe_to_big};
     use crate::halo2::halo2curves::pasta::{Fp, Fq};
+    use crate::utils::{compose, compose_into};
     use ff::PrimeField;
+    use num_integer::div_ceil;
     use rand_core::OsRng;
 
-    use crate::utils::{compose, compose_into, decompose_127_into, decompose_dyn};
+    fn run_test_compostion<W: PrimeField, N: PrimeField>(limb_size: usize) {
+        let wrong_modulus = &super::modulus::<W>();
+        let number_of_limbs = div_ceil(wrong_modulus.bits() as usize, limb_size);
 
-    use super::{decompose, decompose_into, decompose_into_dyn, fe_to_big};
-
-    fn run_test_compostion<
-        W: PrimeField,
-        N: PrimeField,
-        const NUMBER_OF_LIMBS: usize,
-        const LIMB_SIZE: usize,
-    >() {
         for _ in 0..100000 {
             let e0 = W::random(OsRng);
 
-            let u0 = decompose_into_dyn::<W, N>(&e0, NUMBER_OF_LIMBS, LIMB_SIZE);
-            let u1 = decompose_into::<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>(&e0);
-            assert_eq!(u0, u1);
-            let u2 = decompose_127_into::<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>(&e0);
-            assert_eq!(u0, u2);
-            let e1: W = compose_into::<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>(&u2);
+            let u0 = decompose_into::<W, N>(&e0, number_of_limbs, limb_size);
+            let e1: W = compose_into::<W, N>(&u0, limb_size);
             assert_eq!(e0, e1);
 
             let e0 = W::random(OsRng);
             let e0 = fe_to_big(&e0);
-            let u0 = decompose_dyn(&e0, NUMBER_OF_LIMBS, LIMB_SIZE);
-            let u1 = decompose::<NUMBER_OF_LIMBS, LIMB_SIZE>(&e0);
-            assert_eq!(u0, u1);
-            let e1 = compose::<NUMBER_OF_LIMBS, LIMB_SIZE>(&u1);
+            let u0 = decompose(&e0, number_of_limbs, limb_size);
+            let e1 = compose(&u0, limb_size);
             assert_eq!(e0, e1);
         }
     }
 
     #[test]
     fn test_composition() {
-        run_test_compostion::<Fp, Fq, 3, 88>()
+        run_test_compostion::<Fp, Fq>(88)
     }
 }

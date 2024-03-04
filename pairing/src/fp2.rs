@@ -5,31 +5,15 @@ use integer::integer::Integer;
 
 use crate::{Fq2, PairingChip};
 
-impl<
-        N: PrimeField + Ord,
-        const NUMBER_OF_LIMBS: usize,
-        const LIMB_SIZE: usize,
-        const SUBLIMB_SIZE: usize,
-    > PairingChip<N, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE>
-{
-    pub(crate) fn fq2_add(
-        &self,
-        stack: &mut Stack<N>,
-        a: &Fq2<N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-        b: &Fq2<N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-    ) -> Fq2<N, NUMBER_OF_LIMBS, LIMB_SIZE> {
+impl<N: PrimeField + Ord> PairingChip<N> {
+    pub(crate) fn fq2_add(&self, stack: &mut Stack<N>, a: &Fq2<N>, b: &Fq2<N>) -> Fq2<N> {
         Fq2 {
             c0: self.ch.add(stack, &a.c0, &b.c0),
             c1: self.ch.add(stack, &a.c1, &b.c1),
         }
     }
 
-    pub(crate) fn fq2_normal_equal(
-        &self,
-        stack: &mut Stack<N>,
-        a: &Fq2<N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-        b: &Fq2<N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-    ) {
+    pub(crate) fn fq2_normal_equal(&self, stack: &mut Stack<N>, a: &Fq2<N>, b: &Fq2<N>) {
         self.ch.normal_equal(stack, &a.c0, &b.c0);
         self.ch.normal_equal(stack, &a.c1, &b.c1);
     }
@@ -37,16 +21,16 @@ impl<
     pub(crate) fn fq2_mul_by_fq(
         &self,
         stack: &mut Stack<N>,
-        a: &Fq2<N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-        b: &Integer<Fq, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-    ) -> Fq2<N, NUMBER_OF_LIMBS, LIMB_SIZE> {
+        a: &Fq2<N>,
+        b: &Integer<Fq, N>,
+    ) -> Fq2<N> {
         Fq2 {
             c0: self.ch.mul(stack, &a.c0, b, &[]),
             c1: self.ch.mul(stack, &a.c1, b, &[]),
         }
     }
 
-    pub(crate) fn fq2_one(&self, stack: &mut Stack<N>) -> Fq2<N, NUMBER_OF_LIMBS, LIMB_SIZE> {
+    pub(crate) fn fq2_one(&self, stack: &mut Stack<N>) -> Fq2<N> {
         let one = self.ch.register_constant(stack, &Fq::ONE);
         let zero = self.ch.register_constant(stack, &Fq::ZERO);
         Fq2 {
@@ -55,7 +39,7 @@ impl<
         }
     }
 
-    pub(crate) fn fq2_zero(&self, stack: &mut Stack<N>) -> Fq2<N, NUMBER_OF_LIMBS, LIMB_SIZE> {
+    pub(crate) fn fq2_zero(&self, stack: &mut Stack<N>) -> Fq2<N> {
         let zero = self.ch.register_constant(stack, &Fq::ZERO);
         Fq2 {
             c0: zero.clone(),
@@ -63,67 +47,41 @@ impl<
         }
     }
 
-    pub(crate) fn fq2_constant(
-        &self,
-        stack: &mut Stack<N>,
-        constant: ConstantFq2,
-    ) -> Fq2<N, NUMBER_OF_LIMBS, LIMB_SIZE> {
+    pub(crate) fn fq2_constant(&self, stack: &mut Stack<N>, constant: ConstantFq2) -> Fq2<N> {
         let c0 = self.ch.register_constant(stack, &constant.c0);
         let c1 = self.ch.register_constant(stack, &constant.c1);
         Fq2 { c0, c1 }
     }
 
-    pub(crate) fn fq2_double(
-        &self,
-        stack: &mut Stack<N>,
-        a: &Fq2<N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-    ) -> Fq2<N, NUMBER_OF_LIMBS, LIMB_SIZE> {
+    pub(crate) fn fq2_double(&self, stack: &mut Stack<N>, a: &Fq2<N>) -> Fq2<N> {
         Fq2 {
             c0: self.ch.add(stack, &a.c0, &a.c0),
             c1: self.ch.add(stack, &a.c1, &a.c1),
         }
     }
 
-    pub(crate) fn fq2_sub(
-        &self,
-        stack: &mut Stack<N>,
-        a: &Fq2<N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-        b: &Fq2<N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-    ) -> Fq2<N, NUMBER_OF_LIMBS, LIMB_SIZE> {
+    pub(crate) fn fq2_sub(&self, stack: &mut Stack<N>, a: &Fq2<N>, b: &Fq2<N>) -> Fq2<N> {
         Fq2 {
             c0: self.ch.sub(stack, &a.c0, &b.c0),
             c1: self.ch.sub(stack, &a.c1, &b.c1),
         }
     }
 
-    pub(crate) fn fq2_neg(
-        &self,
-        stack: &mut Stack<N>,
-        a: &Fq2<N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-    ) -> Fq2<N, NUMBER_OF_LIMBS, LIMB_SIZE> {
+    pub(crate) fn fq2_neg(&self, stack: &mut Stack<N>, a: &Fq2<N>) -> Fq2<N> {
         Fq2 {
             c0: self.ch.neg(stack, &a.c0),
             c1: self.ch.neg(stack, &a.c1),
         }
     }
 
-    pub(crate) fn fq2_conj(
-        &self,
-        stack: &mut Stack<N>,
-        a: &Fq2<N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-    ) -> Fq2<N, NUMBER_OF_LIMBS, LIMB_SIZE> {
+    pub(crate) fn fq2_conj(&self, stack: &mut Stack<N>, a: &Fq2<N>) -> Fq2<N> {
         Fq2 {
             c0: a.c0.clone(),
             c1: self.ch.neg(stack, &a.c1),
         }
     }
 
-    pub(crate) fn fq2_mul(
-        &self,
-        stack: &mut Stack<N>,
-        a: &Fq2<N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-        b: &Fq2<N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-    ) -> Fq2<N, NUMBER_OF_LIMBS, LIMB_SIZE> {
+    pub(crate) fn fq2_mul(&self, stack: &mut Stack<N>, a: &Fq2<N>, b: &Fq2<N>) -> Fq2<N> {
         let t1 = self.ch.mul(stack, &a.c0, &b.c0, &[]);
         let t2 = self.ch.mul(stack, &a.c1, &b.c1, &[]);
         let t0 = self.ch.add(stack, &a.c0, &a.c1);
@@ -135,11 +93,7 @@ impl<
         Fq2 { c0, c1 }
     }
 
-    pub(crate) fn fq2_square(
-        &self,
-        stack: &mut Stack<N>,
-        a: &Fq2<N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-    ) -> Fq2<N, NUMBER_OF_LIMBS, LIMB_SIZE> {
+    pub(crate) fn fq2_square(&self, stack: &mut Stack<N>, a: &Fq2<N>) -> Fq2<N> {
         let t0 = self.ch.add(stack, &a.c0, &a.c1);
         let t1 = self.ch.sub(stack, &a.c0, &a.c1);
         let t2 = self.ch.add(stack, &a.c0, &a.c0);
@@ -148,11 +102,7 @@ impl<
         Fq2 { c0, c1 }
     }
 
-    pub(crate) fn fq2_mul_by_non_residue(
-        &self,
-        stack: &mut Stack<N>,
-        a: &Fq2<N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-    ) -> Fq2<N, NUMBER_OF_LIMBS, LIMB_SIZE> {
+    pub(crate) fn fq2_mul_by_non_residue(&self, stack: &mut Stack<N>, a: &Fq2<N>) -> Fq2<N> {
         let t0 = self.ch.double(stack, &a.c1);
         let t0 = self.ch.double(stack, &t0);
         let t0 = self.ch.double(stack, &t0);
@@ -170,8 +120,8 @@ impl<
     // pub(crate) fn fq2_mul_by_b(
     //     &self,
     //     stack: &mut Stack<N>,
-    //     a: &Fq2<N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-    // ) -> Fq2<N, NUMBER_OF_LIMBS, LIMB_SIZE> {
+    //     a: &Fq2<N, >,
+    // ) -> Fq2<N, > {
     //     let t0 = self.ch.add(stack, &a.c0, &a.c0);
     //     let t1 = self.ch.add(stack, &a.c1, &a.c1);
     //     let t0 = self.ch.add(stack, &t0, &t0);
@@ -181,11 +131,7 @@ impl<
     //     Fq2 { c0, c1 }
     // }
 
-    pub(crate) fn fq2_inverse(
-        &self,
-        stack: &mut Stack<N>,
-        a: &Fq2<N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-    ) -> Fq2<N, NUMBER_OF_LIMBS, LIMB_SIZE> {
+    pub(crate) fn fq2_inverse(&self, stack: &mut Stack<N>, a: &Fq2<N>) -> Fq2<N> {
         let t0 = self.ch.square(stack, &a.c0, &[]);
         let t1 = self.ch.square(stack, &a.c1, &[]);
         let t0 = self.ch.add(stack, &t0, &t1);
@@ -198,9 +144,9 @@ impl<
     pub(crate) fn fq2_frobenius_map(
         &self,
         stack: &mut Stack<N>,
-        a: &Fq2<N, NUMBER_OF_LIMBS, LIMB_SIZE>,
+        a: &Fq2<N>,
         power: usize,
-    ) -> Fq2<N, NUMBER_OF_LIMBS, LIMB_SIZE> {
+    ) -> Fq2<N> {
         if power % 2 != 0 {
             self.fq2_conj(stack, a)
         } else {

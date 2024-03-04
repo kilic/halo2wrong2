@@ -10,7 +10,7 @@ use halo2::{
 };
 use integer::{
     chip::IntegerChip,
-    integer::{ConstantInteger, Integer, Range, UnassignedInteger},
+    integer::{Integer, Range},
     rns::Rns,
 };
 
@@ -29,56 +29,45 @@ pub const SIX_U_PLUS_2_NAF: [i8; 65] = [
 ];
 
 #[derive(Clone, Debug)]
-pub struct Fq2<N: PrimeField, const NUMBER_OF_LIMBS: usize, const LIMB_SIZE: usize> {
-    c0: Integer<Fq, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-    c1: Integer<Fq, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
+pub struct Fq2<N: PrimeField> {
+    c0: Integer<Fq, N>,
+    c1: Integer<Fq, N>,
 }
 
 #[derive(Clone, Debug)]
-struct Fq6<N: PrimeField, const NUMBER_OF_LIMBS: usize, const LIMB_SIZE: usize> {
-    c0: Fq2<N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-    c1: Fq2<N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-    c2: Fq2<N, NUMBER_OF_LIMBS, LIMB_SIZE>,
+struct Fq6<N: PrimeField> {
+    c0: Fq2<N>,
+    c1: Fq2<N>,
+    c2: Fq2<N>,
 }
 
 #[derive(Clone, Debug)]
-pub struct Fq12<N: PrimeField, const NUMBER_OF_LIMBS: usize, const LIMB_SIZE: usize> {
-    c0: Fq6<N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-    c1: Fq6<N, NUMBER_OF_LIMBS, LIMB_SIZE>,
+pub struct Fq12<N: PrimeField> {
+    c0: Fq6<N>,
+    c1: Fq6<N>,
 }
 
 #[derive(Clone, Debug)]
-pub struct Point2Affine<N: PrimeField, const NUMBER_OF_LIMBS: usize, const LIMB_SIZE: usize> {
-    x: Fq2<N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-    y: Fq2<N, NUMBER_OF_LIMBS, LIMB_SIZE>,
+pub struct Point2Affine<N: PrimeField> {
+    x: Fq2<N>,
+    y: Fq2<N>,
 }
 
 #[derive(Clone, Debug)]
-pub struct Point2<N: PrimeField, const NUMBER_OF_LIMBS: usize, const LIMB_SIZE: usize> {
-    x: Fq2<N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-    y: Fq2<N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-    z: Fq2<N, NUMBER_OF_LIMBS, LIMB_SIZE>,
+pub struct Point2<N: PrimeField> {
+    x: Fq2<N>,
+    y: Fq2<N>,
+    z: Fq2<N>,
 }
 
 #[derive(Debug, Clone)]
-pub struct PairingChip<
-    N: PrimeField + Ord,
-    const NUMBER_OF_LIMBS: usize,
-    const LIMB_SIZE: usize,
-    const SUBLIMB_SIZE: usize,
-> {
-    pub ch: IntegerChip<Fq, N, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE>,
+pub struct PairingChip<N: PrimeField + Ord> {
+    pub ch: IntegerChip<Fq, N>,
 }
 
-impl<
-        N: PrimeField + Ord,
-        const NUMBER_OF_LIMBS: usize,
-        const LIMB_SIZE: usize,
-        const SUBLIMB_SIZE: usize,
-    > PairingChip<N, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE>
-{
-    pub fn new(rns: &Rns<Fq, N, NUMBER_OF_LIMBS, LIMB_SIZE>) -> Self {
-        let ch = IntegerChip::new(rns);
+impl<N: PrimeField + Ord> PairingChip<N> {
+    pub fn new(rns: &Rns<Fq, N>, sublimb_size: usize) -> Self {
+        let ch = IntegerChip::new(rns, sublimb_size);
         Self { ch }
     }
 
@@ -86,24 +75,21 @@ impl<
         &self,
         stack: &mut Stack<N>,
         e: Value<halo2::halo2curves::bn256::Fq2>,
-    ) -> Fq2<N, NUMBER_OF_LIMBS, LIMB_SIZE> {
+    ) -> Fq2<N> {
         let e = e.map(|e| (e.c0, e.c1));
 
         let c0 = e.map(|e| e.0);
-        let c0 = UnassignedInteger::from_fe(c0);
+
+        let c0 = self.ch.rns().unassigned(c0);
         let c0 = self.ch.assign(stack, c0, Range::Remainder);
 
         let c1 = e.map(|e| e.1);
-        let c1 = UnassignedInteger::from_fe(c1);
+        let c1 = self.ch.rns().unassigned(c1);
         let c1 = self.ch.assign(stack, c1, Range::Remainder);
         Fq2 { c0, c1 }
     }
 
-    pub fn assert_on_curve2(
-        &self,
-        stack: &mut Stack<N>,
-        point: &Point2Affine<N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-    ) {
+    pub fn assert_on_curve2(&self, stack: &mut Stack<N>, point: &Point2Affine<N>) {
         let y_square = &self.fq2_square(stack, &point.y);
         let x_square = &self.fq2_square(stack, &point.x);
         let x_cube = &self.fq2_mul(stack, &point.x, x_square);
@@ -112,11 +98,7 @@ impl<
         self.fq2_normal_equal(stack, x_cube_b, y_square);
     }
 
-    pub fn assign_point2(
-        &self,
-        stack: &mut Stack<N>,
-        point: Value<G2Affine>,
-    ) -> Point2Affine<N, NUMBER_OF_LIMBS, LIMB_SIZE> {
+    pub fn assign_point2(&self, stack: &mut Stack<N>, point: Value<G2Affine>) -> Point2Affine<N> {
         let coordinates = point.map(|point| {
             let coordinates = point.coordinates().unwrap();
             (*coordinates.x(), *coordinates.y())
@@ -132,15 +114,12 @@ impl<
         point
     }
 
-    pub fn assert_on_curve1(
-        &self,
-        stack: &mut Stack<N>,
-        point: &Point<Fq, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-    ) {
+    pub fn assert_on_curve1(&self, stack: &mut Stack<N>, point: &Point<Fq, N>) {
         let y_square = &self.ch.square(stack, point.y(), &[]);
         let x_square = &self.ch.square(stack, point.x(), &[]);
         let x_cube = &self.ch.mul(stack, point.x(), x_square, &[]);
-        let b = ConstantInteger::from_fe(&G1Affine::b());
+        let b = self.ch.rns().constant(&G1Affine::b());
+
         let x_cube_b = &self.ch.add_constant(stack, x_cube, &b);
         self.ch.normal_equal(stack, x_cube_b, y_square);
     }
@@ -149,7 +128,7 @@ impl<
         &self,
         stack: &mut Stack<N>,
         point: Value<G1Affine>,
-    ) -> Point<halo2::halo2curves::bn256::Fq, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
+    ) -> Point<halo2::halo2curves::bn256::Fq, N> {
         let (x, y) = point
             .map(|point| {
                 let coords = point.coordinates();
@@ -164,10 +143,10 @@ impl<
 
         let x = &self
             .ch
-            .range(stack, &UnassignedInteger::from_fe(x), Range::Remainder);
+            .range(stack, &self.ch.rns().unassigned(x), Range::Remainder);
         let y = &self
             .ch
-            .range(stack, &UnassignedInteger::from_fe(y), Range::Remainder);
+            .range(stack, &self.ch.rns().unassigned(y), Range::Remainder);
 
         let point = Point::new(x, y);
         self.assert_on_curve1(stack, &point);
@@ -178,9 +157,9 @@ impl<
     fn miller_loop(
         &self,
         stack: &mut Stack<N>,
-        f: &mut Fq12<N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-        g1: Vec<Point<Fq, N, NUMBER_OF_LIMBS, LIMB_SIZE>>,
-        g2: Vec<Point2Affine<N, NUMBER_OF_LIMBS, LIMB_SIZE>>,
+        f: &mut Fq12<N>,
+        g1: Vec<Point<Fq, N>>,
+        g2: Vec<Point2Affine<N>>,
     ) {
         // TODO: infinity points?
         // in aggregation context we can just disallow
@@ -255,13 +234,7 @@ impl<
             });
     }
 
-    fn double(
-        &self,
-        stack: &mut Stack<N>,
-        f: &mut Fq12<N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-        r: &mut Point2<N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-        g1: &Point<Fq, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-    ) {
+    fn double(&self, stack: &mut Stack<N>, f: &mut Fq12<N>, r: &mut Point2<N>, g1: &Point<Fq, N>) {
         let t0 = self.fq2_square(stack, &r.x);
         let t1 = self.fq2_square(stack, &r.y);
         let t2 = self.fq2_square(stack, &t1);
@@ -306,10 +279,10 @@ impl<
     fn add(
         &self,
         stack: &mut Stack<N>,
-        f: &mut Fq12<N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-        r: &mut Point2<N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-        g2: &Point2Affine<N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-        g1: &Point<Fq, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
+        f: &mut Fq12<N>,
+        r: &mut Point2<N>,
+        g2: &Point2Affine<N>,
+        g1: &Point<Fq, N>,
     ) {
         let zsquared = self.fq2_square(stack, &r.z);
         let ysquared = self.fq2_square(stack, &g2.y);
@@ -356,11 +329,7 @@ impl<
         *f = self.fq12_mul_by_034(stack, f, &t0, &t1, &t9);
     }
 
-    fn exp_by_x(
-        &self,
-        stack: &mut Stack<N>,
-        f: &Fq12<N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-    ) -> Fq12<N, NUMBER_OF_LIMBS, LIMB_SIZE> {
+    fn exp_by_x(&self, stack: &mut Stack<N>, f: &Fq12<N>) -> Fq12<N> {
         pub const BN_X: u64 = 4965661367192848881;
         let x = BN_X;
         let mut res = self.fq12_one(stack);
@@ -375,7 +344,7 @@ impl<
         res
     }
 
-    fn final_exp(&self, stack: &mut Stack<N>, f: &mut Fq12<N, NUMBER_OF_LIMBS, LIMB_SIZE>) {
+    fn final_exp(&self, stack: &mut Stack<N>, f: &mut Fq12<N>) {
         let t0 = self.fq12_frobenius_map(stack, f, 6);
         let t1 = self.fq12_inverse(stack, f);
         let t1 = self.fq12_mul(stack, &t1, &t0);
@@ -417,7 +386,7 @@ impl<
         *f = t1;
     }
 
-    fn is_one(&self, stack: &mut Stack<N>, f: &Fq12<N, NUMBER_OF_LIMBS, LIMB_SIZE>) -> Witness<N> {
+    fn is_one(&self, stack: &mut Stack<N>, f: &Fq12<N>) -> Witness<N> {
         let mut acc = self.ch.is_one(stack, &f.c0.c0.c0);
         let next = self.ch.is_zero(stack, &f.c0.c0.c1);
         acc = stack.mul(&acc, &next);
@@ -448,8 +417,8 @@ impl<
     pub fn pairing_check(
         &self,
         stack: &mut Stack<N>,
-        g1: Vec<Point<Fq, N, NUMBER_OF_LIMBS, LIMB_SIZE>>,
-        g2: Vec<Point2Affine<N, NUMBER_OF_LIMBS, LIMB_SIZE>>,
+        g1: Vec<Point<Fq, N>>,
+        g2: Vec<Point2Affine<N>>,
     ) -> Witness<N> {
         let mut f = self.fq12_one(stack);
         self.miller_loop(stack, &mut f, g1, g2);

@@ -3,7 +3,7 @@ use ff::PrimeField;
 use halo2::{circuit::Value, halo2curves::CurveAffine};
 use integer::{
     chip::IntegerChip,
-    integer::{ConstantInteger, Integer, Range, UnassignedInteger},
+    integer::{ConstantInteger, Integer, Range},
     rns::Rns,
 };
 
@@ -17,38 +17,27 @@ pub mod mul_var;
 mod test;
 
 #[derive(Debug, Clone)]
-pub struct GeneralEccChip<
-    Emulated: CurveAffine,
-    N: PrimeField + Ord,
-    const NUMBER_OF_LIMBS: usize,
-    const LIMB_SIZE: usize,
-    const SUBLIMB_SIZE: usize,
-> {
-    pub ch_base: IntegerChip<Emulated::Base, N, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE>,
-    pub ch_scalar: IntegerChip<Emulated::Scalar, N, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE>,
+pub struct GeneralEccChip<Emulated: CurveAffine, N: PrimeField + Ord> {
+    pub ch_base: IntegerChip<Emulated::Base, N>,
+    pub ch_scalar: IntegerChip<Emulated::Scalar, N>,
     constant_aux: Emulated,
     witness_aux: Value<Emulated>,
-    b: ConstantInteger<Emulated::Base, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
+    b: ConstantInteger<Emulated::Base, N>,
 }
 
-impl<
-        Emulated: CurveAffine,
-        N: PrimeField + Ord,
-        const NUMBER_OF_LIMBS: usize,
-        const LIMB_SIZE: usize,
-        const SUBLIMB_SIZE: usize,
-    > GeneralEccChip<Emulated, N, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE>
-{
+impl<Emulated: CurveAffine, N: PrimeField + Ord> GeneralEccChip<Emulated, N> {
     pub fn new(
-        rns_base: &Rns<Emulated::Base, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-        rns_scalar: &Rns<Emulated::Scalar, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
+        rns_base: &Rns<Emulated::Base, N>,
+        rns_scalar: &Rns<Emulated::Scalar, N>,
         witness_aux: Value<Emulated>,
         constant_aux: Emulated,
+        sublimb_size: usize,
     ) -> Self {
-        let ch_base = IntegerChip::new(rns_base);
-        let ch_scalar = IntegerChip::new(rns_scalar);
+        let ch_base = IntegerChip::new(rns_base, sublimb_size);
+        let ch_scalar = IntegerChip::new(rns_scalar, sublimb_size);
 
-        let b = Self::parameter_b();
+        let b = rns_base.constant(&Emulated::b());
+
         Self {
             witness_aux,
             constant_aux,
@@ -58,16 +47,12 @@ impl<
         }
     }
 
-    fn parameter_b() -> ConstantInteger<Emulated::Base, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
-        ConstantInteger::from_fe(&Emulated::b())
-    }
-
     pub fn assign_scalar(
         &self,
         stack: &mut Stack<N>,
         scalar: Value<Emulated::Scalar>,
-    ) -> Integer<Emulated::Scalar, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
-        let scalar = UnassignedInteger::from_fe(scalar);
+    ) -> Integer<Emulated::Scalar, N> {
+        let scalar = self.ch_scalar.rns().unassigned(scalar);
         self.ch_scalar
             .range(stack, &scalar, integer::integer::Range::Remainder)
     }
@@ -76,7 +61,7 @@ impl<
         &self,
         stack: &mut Stack<N>,
         point: Emulated,
-    ) -> Point<Emulated::Base, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
+    ) -> Point<Emulated::Base, N> {
         let coords = point.coordinates();
         // disallow point of infinity
         // it will not pass assing point enforcement
@@ -92,7 +77,7 @@ impl<
         &self,
         stack: &mut Stack<N>,
         point: Value<Emulated>,
-    ) -> Point<Emulated::Base, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
+    ) -> Point<Emulated::Base, N> {
         let (x, y) = point
             .map(|point| {
                 let coords = point.coordinates();
@@ -107,10 +92,10 @@ impl<
 
         let x = &self
             .ch_base
-            .range(stack, &UnassignedInteger::from_fe(x), Range::Remainder);
+            .range(stack, &self.ch_base.rns().unassigned(x), Range::Remainder);
         let y = &self
             .ch_base
-            .range(stack, &UnassignedInteger::from_fe(y), Range::Remainder);
+            .range(stack, &self.ch_base.rns().unassigned(y), Range::Remainder);
 
         let point = Point::new(x, y);
         self.assert_on_curve(stack, &point);
@@ -124,7 +109,7 @@ impl<
         tag: N,
         address: N,
         y_offset: usize,
-        point: &Point<Emulated::Base, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
+        point: &Point<Emulated::Base, N>,
     ) {
         let y_offset = N::from(y_offset as u64);
 
@@ -140,7 +125,7 @@ impl<
         address_base: N,
         address_fraction: &Witness<N>,
         y_offset: usize,
-    ) -> Point<Emulated::Base, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
+    ) -> Point<Emulated::Base, N> {
         let y_offset = N::from(y_offset as u64);
 
         let x = &self
@@ -159,11 +144,7 @@ impl<
         Point::new(x, y)
     }
 
-    pub fn assert_on_curve(
-        &self,
-        stack: &mut Stack<N>,
-        point: &Point<Emulated::Base, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-    ) {
+    pub fn assert_on_curve(&self, stack: &mut Stack<N>, point: &Point<Emulated::Base, N>) {
         let y_square = &self.ch_base.square(stack, point.y(), &[]);
         let x_square = &self.ch_base.square(stack, point.x(), &[]);
         let x_cube = &self.ch_base.mul(stack, point.x(), x_square, &[]);
@@ -174,8 +155,8 @@ impl<
     pub fn copy_equal(
         &self,
         stack: &mut Stack<N>,
-        p0: &Point<Emulated::Base, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-        p1: &Point<Emulated::Base, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
+        p0: &Point<Emulated::Base, N>,
+        p1: &Point<Emulated::Base, N>,
     ) {
         self.ch_base.copy_equal(stack, p0.x(), p1.x());
         self.ch_base.copy_equal(stack, p0.y(), p1.y());
@@ -184,8 +165,8 @@ impl<
     pub fn normal_equal(
         &self,
         stack: &mut Stack<N>,
-        p0: &Point<Emulated::Base, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-        p1: &Point<Emulated::Base, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
+        p0: &Point<Emulated::Base, N>,
+        p1: &Point<Emulated::Base, N>,
     ) {
         // TODO: consider using normalize
         self.ch_base.normal_equal(stack, p0.x(), p1.x());
@@ -195,8 +176,8 @@ impl<
     pub fn normalize(
         &self,
         stack: &mut Stack<N>,
-        point: &Point<Emulated::Base, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-    ) -> Point<Emulated::Base, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
+        point: &Point<Emulated::Base, N>,
+    ) -> Point<Emulated::Base, N> {
         let x = &self.ch_base.reduce(stack, point.x());
         let y = &self.ch_base.reduce(stack, point.y());
         Point::new(x, y)
@@ -206,9 +187,9 @@ impl<
         &self,
         stack: &mut Stack<N>,
         c: &Witness<N>,
-        p1: &Point<Emulated::Base, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-        p2: &Point<Emulated::Base, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-    ) -> Point<Emulated::Base, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
+        p1: &Point<Emulated::Base, N>,
+        p2: &Point<Emulated::Base, N>,
+    ) -> Point<Emulated::Base, N> {
         let x = &self.ch_base.select(stack, p1.x(), p2.x(), c);
         let y = &self.ch_base.select(stack, p1.y(), p2.y(), c);
         Point::new(x, y)
@@ -218,8 +199,8 @@ impl<
         &self,
         stack: &mut Stack<N>,
         selector: &[Witness<N>],
-        table: &[Point<Emulated::Base, N, NUMBER_OF_LIMBS, LIMB_SIZE>],
-    ) -> Point<Emulated::Base, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
+        table: &[Point<Emulated::Base, N>],
+    ) -> Point<Emulated::Base, N> {
         let number_of_selectors = selector.len();
         let mut reducer = table.to_vec();
         for (i, selector) in selector.iter().enumerate() {
@@ -235,9 +216,9 @@ impl<
     pub fn add_incomplete(
         &self,
         stack: &mut Stack<N>,
-        a: &Point<Emulated::Base, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-        b: &Point<Emulated::Base, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-    ) -> Point<Emulated::Base, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
+        a: &Point<Emulated::Base, N>,
+        b: &Point<Emulated::Base, N>,
+    ) -> Point<Emulated::Base, N> {
         // lambda = b_y - a_y / b_x - a_x
         let numer = &self.ch_base.sub(stack, &b.y, &a.y);
         let denom = &self.ch_base.sub(stack, &b.x, &a.x);
@@ -257,9 +238,9 @@ impl<
     pub fn sub_incomplete(
         &self,
         stack: &mut Stack<N>,
-        a: &Point<Emulated::Base, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-        b: &Point<Emulated::Base, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-    ) -> Point<Emulated::Base, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
+        a: &Point<Emulated::Base, N>,
+        b: &Point<Emulated::Base, N>,
+    ) -> Point<Emulated::Base, N> {
         // lambda = b_y + a_y / a_x - b_x
         let numer = &self.ch_base.add(stack, &b.y, &a.y);
         let denom = &self.ch_base.sub(stack, &a.x, &b.x);
@@ -280,8 +261,8 @@ impl<
     pub fn double_incomplete(
         &self,
         stack: &mut Stack<N>,
-        point: &Point<Emulated::Base, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-    ) -> Point<Emulated::Base, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
+        point: &Point<Emulated::Base, N>,
+    ) -> Point<Emulated::Base, N> {
         // lambda = (3 * a_x^2) / 2 * a_y
         let x_0_square = &self.ch_base.square(stack, &point.x, &[]);
         let numer = &self.ch_base.mul3(stack, x_0_square);
@@ -320,23 +301,18 @@ impl<
     pub fn add_multi(
         &self,
         stack: &mut Stack<N>,
-        points: &[Point<Emulated::Base, N, NUMBER_OF_LIMBS, LIMB_SIZE>],
-    ) -> Point<Emulated::Base, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
+        points: &[Point<Emulated::Base, N>],
+    ) -> Point<Emulated::Base, N> {
         assert!(!points.is_empty());
         if points.len() == 1 {
             return points[0].clone();
         }
 
-        struct State<
-            W: PrimeField,
-            N: PrimeField,
-            const NUMBER_OF_LIMBS: usize,
-            const LIMB_SIZE: usize,
-        > {
-            x_prev: Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-            y_prev: Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-            x_cur: Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-            lambda: Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
+        struct State<W: PrimeField, N: PrimeField> {
+            x_prev: Integer<W, N>,
+            y_prev: Integer<W, N>,
+            x_cur: Integer<W, N>,
+            lambda: Integer<W, N>,
         }
 
         let p0 = &points[0];
@@ -380,9 +356,9 @@ impl<
     //     &self,
     //     stack: &mut Stack,
 
-    //     to_double: &Point<Emulated::Base, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-    //     to_add: &Point<Emulated::Base, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-    // ) -> Point<Emulated::Base, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
+    //     to_double: &Point<Emulated::Base, N, >,
+    //     to_add: &Point<Emulated::Base, N, >,
+    // ) -> Point<Emulated::Base, N, > {
     //     // (P + Q) + P
     //     // P is to_double (x_1, y_1)
     //     // Q is to_add (x_2, y_2)

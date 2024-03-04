@@ -8,14 +8,10 @@ use crate::PoseidonChip;
 
 /// `PointRepresentation` will encode point with an implemented strategy
 pub trait PointRepresentation<C: CurveAffine, N: PrimeField + Ord>: Default {
-    fn encode_assigned<
-        const NUMBER_OF_LIMBS: usize,
-        const LIMB_SIZE: usize,
-        const SUBLIMB_SIZE: usize,
-    >(
+    fn encode_assigned(
         stack: &mut Stack<N>,
-        integer_chip: IntegerChip<C::Base, N, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE>,
-        point: &Point<C::Base, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
+        integer_chip: IntegerChip<C::Base, N>,
+        point: &Point<C::Base, N>,
     ) -> Vec<Witness<N>>;
 }
 
@@ -24,14 +20,10 @@ pub trait PointRepresentation<C: CurveAffine, N: PrimeField + Ord>: Default {
 pub struct LimbRepresentation;
 
 impl<C: CurveAffine, N: PrimeField + Ord> PointRepresentation<C, N> for LimbRepresentation {
-    fn encode_assigned<
-        const NUMBER_OF_LIMBS: usize,
-        const LIMB_SIZE: usize,
-        const SUBLIMB_SIZE: usize,
-    >(
+    fn encode_assigned(
         stack: &mut Stack<N>,
-        integer_chip: IntegerChip<C::Base, N, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE>,
-        point: &Point<C::Base, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
+        integer_chip: IntegerChip<C::Base, N>,
+        point: &Point<C::Base, N>,
     ) -> Vec<Witness<N>> {
         let mut encoded: Vec<Witness<N>> = point.x().limbs().to_vec();
         let sign = integer_chip.sign(stack, point.y());
@@ -45,14 +37,10 @@ impl<C: CurveAffine, N: PrimeField + Ord> PointRepresentation<C, N> for LimbRepr
 pub struct NativeRepresentation;
 
 impl<C: CurveAffine, N: PrimeField + Ord> PointRepresentation<C, N> for NativeRepresentation {
-    fn encode_assigned<
-        const NUMBER_OF_LIMBS: usize,
-        const LIMB_SIZE: usize,
-        const SUBLIMB_SIZE: usize,
-    >(
+    fn encode_assigned(
         _stack: &mut Stack<N>,
-        _integer_chip: IntegerChip<C::Base, N, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE>,
-        point: &Point<C::Base, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
+        _integer_chip: IntegerChip<C::Base, N>,
+        point: &Point<C::Base, N>,
     ) -> Vec<Witness<N>> {
         vec![*point.x().native(), *point.y().native()]
     }
@@ -76,17 +64,11 @@ impl<N: PrimeField + Ord, const T: usize, const RATE: usize> TranscriptChip<N, T
     }
 
     /// Write point to the transcript
-    pub fn write_point<
-        C: CurveAffine,
-        E: PointRepresentation<C, N>,
-        const NUMBER_OF_LIMBS: usize,
-        const LIMB_SIZE: usize,
-        const SUBLIMB_SIZE: usize,
-    >(
+    pub fn write_point<C: CurveAffine, E: PointRepresentation<C, N>>(
         &mut self,
         stack: &mut Stack<N>,
-        integer_chip: IntegerChip<C::Base, N, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE>,
-        point: &Point<C::Base, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
+        integer_chip: IntegerChip<C::Base, N>,
+        point: &Point<C::Base, N>,
     ) -> Result<(), Error> {
         let encoded = E::encode_assigned(stack, integer_chip, point);
         self.poseidon.update(&encoded[..]);

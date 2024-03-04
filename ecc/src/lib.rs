@@ -7,19 +7,13 @@ pub mod base_field_ecc;
 pub mod general_ecc;
 
 #[derive(Clone, Debug)]
-pub struct Point<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const LIMB_SIZE: usize>
-{
-    x: Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-    y: Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
+pub struct Point<W: PrimeField, N: PrimeField> {
+    x: Integer<W, N>,
+    y: Integer<W, N>,
 }
 
-impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const LIMB_SIZE: usize>
-    Point<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>
-{
-    pub fn new(
-        x: &Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-        y: &Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-    ) -> Point<W, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
+impl<W: PrimeField, N: PrimeField> Point<W, N> {
+    pub fn new(x: &Integer<W, N>, y: &Integer<W, N>) -> Point<W, N> {
         Point {
             x: x.clone(),
             y: y.clone(),
@@ -35,11 +29,11 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const LIMB_SIZE
             .collect()
     }
 
-    pub fn x(&self) -> &Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
+    pub fn x(&self) -> &Integer<W, N> {
         &self.x
     }
 
-    pub fn y(&self) -> &Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
+    pub fn y(&self) -> &Integer<W, N> {
         &self.y
     }
 
@@ -55,21 +49,16 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const LIMB_SIZE
 }
 
 #[derive(Clone, Debug)]
-pub struct ConstantPoint<
-    W: PrimeField,
-    N: PrimeField,
-    const NUMBER_OF_LIMBS: usize,
-    const LIMB_SIZE: usize,
-> {
-    x: ConstantInteger<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-    y: ConstantInteger<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
+pub struct ConstantPoint<W: PrimeField, N: PrimeField> {
+    x: ConstantInteger<W, N>,
+    y: ConstantInteger<W, N>,
 }
-impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const LIMB_SIZE: usize>
-    ConstantPoint<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>
-{
+impl<W: PrimeField, N: PrimeField> ConstantPoint<W, N> {
     pub fn new<Emulated: CurveAffine>(
         point: Emulated,
-    ) -> ConstantPoint<Emulated::Base, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
+        number_of_limbs: usize,
+        limb_size: usize,
+    ) -> ConstantPoint<Emulated::Base, N> {
         let coords = point.coordinates();
         // disallow point of infinity
         // it will not pass assing point enforcement
@@ -77,16 +66,16 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const LIMB_SIZE
         let x = coords.x();
         let y = coords.y();
         ConstantPoint {
-            x: ConstantInteger::from_fe(x),
-            y: ConstantInteger::from_fe(y),
+            x: ConstantInteger::from_fe(x, number_of_limbs, limb_size),
+            y: ConstantInteger::from_fe(y, number_of_limbs, limb_size),
         }
     }
 
-    pub fn x(&self) -> &ConstantInteger<W, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
+    pub fn x(&self) -> &ConstantInteger<W, N> {
         &self.x
     }
 
-    pub fn y(&self) -> &ConstantInteger<W, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
+    pub fn y(&self) -> &ConstantInteger<W, N> {
         &self.y
     }
 

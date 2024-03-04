@@ -5,34 +5,23 @@ use circuitry::chip::range::RangeChip;
 use circuitry::chip::Core;
 use circuitry::stack::Stack;
 use circuitry::{
-    utils::{big_to_fe, big_to_fe_unsafe, decompose, fe_to_big},
+    utils::{big_to_fe, big_to_fe_unsafe, fe_to_big},
     witness::{Scaled, Witness},
 };
 use ff::PrimeField;
 use halo2::circuit::Value;
 
-impl<
-        W: PrimeField,
-        N: PrimeField + Ord,
-        const NUMBER_OF_LIMBS: usize,
-        const LIMB_SIZE: usize,
-        const SUBLIMB_SIZE: usize,
-    > IntegerChip<W, N, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE>
-{
-    pub fn register_constant(
-        &self,
-        stack: &mut Stack<N>,
-        constant: &W,
-    ) -> Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
+impl<W: PrimeField, N: PrimeField + Ord> IntegerChip<W, N> {
+    pub fn register_constant(&self, stack: &mut Stack<N>, constant: &W) -> Integer<W, N> {
         let big = fe_to_big(constant);
         let native: N = big_to_fe(&big);
 
-        let limbs: [N; NUMBER_OF_LIMBS] = decompose::<NUMBER_OF_LIMBS, LIMB_SIZE>(&big)
+        let limbs = self
+            .rns
+            .decompose(&big)
             .iter()
             .map(big_to_fe_unsafe)
-            .collect::<Vec<_>>()
-            .try_into()
-            .unwrap();
+            .collect::<Vec<_>>();
 
         let limbs = limbs
             .iter()
@@ -42,19 +31,20 @@ impl<
         let native = stack.get_constant(native);
 
         Integer::new(
-            &limbs.try_into().unwrap(),
+            &limbs,
             &self.rns.max_remainder_limbs,
             Value::known(big),
             native,
+            self.rns.limb_size,
         )
     }
 
     pub fn range(
         &self,
         stack: &mut Stack<N>,
-        integer: &UnassignedInteger<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
+        integer: &UnassignedInteger<W, N>,
         range: Range,
-    ) -> Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
+    ) -> Integer<W, N> {
         let max_values = self.rns.max_values(range);
         let last_limb_size = max_values.last().unwrap().bits() as usize;
 
@@ -63,10 +53,12 @@ impl<
             .iter()
             .enumerate()
             .map(|(i, limb)| {
-                if i == NUMBER_OF_LIMBS - 1 {
-                    stack.decompose(*limb, last_limb_size, SUBLIMB_SIZE).0
+                if i == self.rns.number_of_limbs - 1 {
+                    stack.decompose(*limb, last_limb_size, self.sublimb_size).0
                 } else {
-                    stack.decompose(*limb, LIMB_SIZE, SUBLIMB_SIZE).0
+                    stack
+                        .decompose(*limb, self.rns.limb_size, self.sublimb_size)
+                        .0
                 }
             })
             .collect::<Vec<_>>();
@@ -80,10 +72,11 @@ impl<
         let native = stack.compose(&terms[..], N::ZERO);
 
         Integer::new(
-            &limbs.try_into().unwrap(),
+            &limbs,
             &max_values,
             integer.big(),
             native,
+            self.rns.limb_size,
         )
     }
 }

@@ -17,7 +17,7 @@ use rand_core::OsRng;
 
 use crate::PairingChip;
 
-fn make_stack(n: usize) -> Stack<Fr> {
+fn make_stack(n: usize, limb_size: usize, sublimb_size: usize) -> Stack<Fr> {
     assert!(!n.is_zero());
     let mut acc = Fr::ZERO;
     let n = 2;
@@ -36,8 +36,8 @@ fn make_stack(n: usize) -> Stack<Fr> {
     g1.push((G1Affine::generator() * -acc).into());
     g2.push(G2Affine::generator());
 
-    let rns: Rns<_, Fr, 3, 90> = Rns::construct();
-    let ch: PairingChip<Fr, 3, 90, 18> = PairingChip::new(&rns);
+    let rns: Rns<_, Fr> = Rns::construct(limb_size);
+    let ch: PairingChip<Fr> = PairingChip::new(&rns, sublimb_size);
 
     let stack = &mut Stack::default();
     let g1 = g1
@@ -57,12 +57,7 @@ fn make_stack(n: usize) -> Stack<Fr> {
 }
 
 #[derive(Clone)]
-struct TestConfig<
-    const RANGE_W: usize,
-    const NUMBER_OF_LIMBS: usize,
-    const LIMB_SIZE: usize,
-    const SUBLIMB_SIZE: usize,
-> {
+struct TestConfig<const RANGE_W: usize> {
     vertical_gate: VerticalGate<RANGE_W>,
     vanilla_gate: VanillaGate,
     range_gate: RangeGate,
@@ -72,26 +67,17 @@ struct TestConfig<
 #[derive(Default, Clone)]
 struct Params {
     n: usize,
+    limb_size: usize,
+    sublimb_size: usize,
 }
 
 #[derive(Default)]
-struct TestCircuit<
-    const RANGE_W: usize,
-    const NUMBER_OF_LIMBS: usize,
-    const LIMB_SIZE: usize,
-    const SUBLIMB_SIZE: usize,
-> {
+struct TestCircuit<const RANGE_W: usize> {
     params: Params,
 }
 
-impl<
-        const RANGE_W: usize,
-        const NUMBER_OF_LIMBS: usize,
-        const LIMB_SIZE: usize,
-        const SUBLIMB_SIZE: usize,
-    > Circuit<Fr> for TestCircuit<RANGE_W, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE>
-{
-    type Config = TestConfig<RANGE_W, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE>;
+impl<const RANGE_W: usize> Circuit<Fr> for TestCircuit<RANGE_W> {
+    type Config = TestConfig<RANGE_W>;
     type FloorPlanner = SimpleFloorPlanner;
     type Params = Params;
 
@@ -108,7 +94,7 @@ impl<
         let vanilla_gate = VanillaGate::configure(meta);
 
         let t0 = start_timer!(|| "witness gen");
-        let stack = make_stack(params.n);
+        let stack = make_stack(params.n, params.limb_size, params.sublimb_size);
         end_timer!(t0);
 
         Self::Config {
@@ -151,17 +137,13 @@ impl<
     }
 }
 
-fn run_test<
-    const RANGE_W: usize,
-    const NUMBER_OF_LIMBS: usize,
-    const LIMB_SIZE: usize,
-    const SUBLIMB_SIZE: usize,
->(
-    n: usize,
-    k: u32,
-) {
-    let params = Params { n };
-    let circuit = TestCircuit::<RANGE_W, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE> { params };
+fn run_test<const RANGE_W: usize>(k: u32, limb_size: usize, sublimb_size: usize, n: usize) {
+    let params = Params {
+        n,
+        limb_size,
+        sublimb_size,
+    };
+    let circuit = TestCircuit::<RANGE_W> { params };
     let public_inputs = vec![];
     let prover = match MockProver::run(k, &circuit, public_inputs) {
         Ok(prover) => prover,
@@ -172,10 +154,5 @@ fn run_test<
 
 #[test]
 fn test_pairing() {
-    run_test::<
-        2,
-        3,  // number of limbs
-        90, // limb size
-        18, // sublimb size
-    >(2, 21);
+    run_test::<2>(21, 90, 18, 2);
 }

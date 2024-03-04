@@ -10,19 +10,12 @@ use num_traits::Zero;
 use crate::chip::IntegerChip;
 use crate::integer::{Integer, Range};
 
-impl<
-        W: PrimeField,
-        N: PrimeField + Ord,
-        const NUMBER_OF_LIMBS: usize,
-        const LIMB_SIZE: usize,
-        const SUBLIMB_SIZE: usize,
-    > IntegerChip<W, N, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE>
-{
+impl<W: PrimeField, N: PrimeField + Ord> IntegerChip<W, N> {
     pub fn reduce_if_necessary(
         &self,
         stack: &mut Stack<N>,
-        integer: &Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-    ) -> Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
+        integer: &Integer<W, N>,
+    ) -> Integer<W, N> {
         if self.is_gt_max_operand(integer) {
             self.reduce(stack, integer)
         } else {
@@ -30,15 +23,13 @@ impl<
         }
     }
 
-    pub fn reduce(
-        &self,
-        stack: &mut Stack<N>,
-        integer: &Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-    ) -> Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
+    pub fn reduce(&self, stack: &mut Stack<N>, integer: &Integer<W, N>) -> Integer<W, N> {
         let (result, quotient) = self.rns.reduction_witness(integer);
 
         let result = self.range(stack, &result, Range::Remainder);
-        let quotient = stack.decompose(quotient, LIMB_SIZE, SUBLIMB_SIZE).0;
+        let quotient = stack
+            .decompose(quotient, self.rns.limb_size, self.sublimb_size)
+            .0;
 
         let base = self.rns.rsh(1);
         let intermediate = integer
@@ -63,7 +54,7 @@ impl<
             .zip(self.rns.big_neg_wrong_limbs_in_binary.iter())
             .map(|(limb, w)| {
                 let t = &self.rns.max_reduction_quotient * w + limb + &carry_max;
-                carry_max = t >> LIMB_SIZE;
+                carry_max = t >> self.rns.limb_size;
                 carry_max.bits()
             });
 
@@ -79,7 +70,7 @@ impl<
                 let carry_tmp_0: Witness<N> = stack.compose(&terms[..], N::ZERO);
 
                 let carry_tmp_1 = &stack
-                    .decompose(carry_tmp_0.value(), carry_max as usize, SUBLIMB_SIZE)
+                    .decompose(carry_tmp_0.value(), carry_max as usize, self.sublimb_size)
                     .0;
 
                 stack.equal(&carry_tmp_0, carry_tmp_1);
@@ -95,11 +86,7 @@ impl<
         result
     }
 
-    pub fn assert_zero(
-        &self,
-        stack: &mut Stack<N>,
-        integer: &Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-    ) {
+    pub fn assert_zero(&self, stack: &mut Stack<N>, integer: &Integer<W, N>) {
         let (_result, quotient) = self.rns.reduction_witness(integer);
         #[cfg(feature = "prover-sanity")]
         {
@@ -108,7 +95,9 @@ impl<
                 .map(|result| assert_eq!(result, BigUint::zero()));
         }
 
-        let quotient = stack.decompose(quotient, LIMB_SIZE, SUBLIMB_SIZE).0;
+        let quotient = stack
+            .decompose(quotient, self.rns.limb_size, self.sublimb_size)
+            .0;
 
         let base = self.rns.rsh(1);
         let intermediate = integer
@@ -126,7 +115,7 @@ impl<
             .zip(self.rns.big_neg_wrong_limbs_in_binary.iter())
             .map(|(limb, w)| {
                 let t = &self.rns.max_reduction_quotient * w + limb + &carry_max;
-                carry_max = t >> LIMB_SIZE;
+                carry_max = t >> self.rns.limb_size;
                 carry_max.bits()
             });
 
@@ -142,7 +131,7 @@ impl<
                 let carry_tmp_0: Witness<N> = stack.compose(&terms[..], N::ZERO);
 
                 let carry_tmp_1 = &stack
-                    .decompose(carry_tmp_0.value(), carry_max as usize, SUBLIMB_SIZE)
+                    .decompose(carry_tmp_0.value(), carry_max as usize, self.sublimb_size)
                     .0;
 
                 stack.equal(&carry_tmp_0, carry_tmp_1);

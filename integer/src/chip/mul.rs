@@ -14,20 +14,13 @@ macro_rules! div_ceil {
     };
 }
 
-impl<
-        W: PrimeField,
-        N: PrimeField + Ord,
-        const NUMBER_OF_LIMBS: usize,
-        const LIMB_SIZE: usize,
-        const SUBLIMB_SIZE: usize,
-    > IntegerChip<W, N, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE>
-{
+impl<W: PrimeField, N: PrimeField + Ord> IntegerChip<W, N> {
     pub fn square(
         &self,
         stack: &mut Stack<N>,
-        w0: &Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-        to_add: &[&Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>],
-    ) -> Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
+        w0: &Integer<W, N>,
+        to_add: &[&Integer<W, N>],
+    ) -> Integer<W, N> {
         let w0 = &self.reduce_if_necessary(stack, w0);
 
         let (result, quotient) = self.rns.mul_witness(w0, w0, to_add);
@@ -115,7 +108,9 @@ impl<
                         .collect::<Vec<_>>();
 
                     let carry_0 = &stack.compose_second_degree(&terms[..], N::ZERO);
-                    let carry_1 = &stack.decompose(carry_0.value(), *max_carry, SUBLIMB_SIZE).0;
+                    let carry_1 = &stack
+                        .decompose(carry_0.value(), *max_carry, self.sublimb_size)
+                        .0;
 
                     stack.equal(carry_0, carry_1);
                     carry = carry_0.scale(*base).into();
@@ -142,10 +137,10 @@ impl<
     pub fn mul(
         &self,
         stack: &mut Stack<N>,
-        w0: &Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-        w1: &Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-        to_add: &[&Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>],
-    ) -> Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
+        w0: &Integer<W, N>,
+        w1: &Integer<W, N>,
+        to_add: &[&Integer<W, N>],
+    ) -> Integer<W, N> {
         let w0 = &self.reduce_if_necessary(stack, w0);
         let w1 = &self.reduce_if_necessary(stack, w1);
 
@@ -224,7 +219,9 @@ impl<
 
                     let carry_0 = &stack.compose_second_degree(&terms[..], N::ZERO);
 
-                    let carry_1 = &stack.decompose(carry_0.value(), *max_carry, SUBLIMB_SIZE).0;
+                    let carry_1 = &stack
+                        .decompose(carry_0.value(), *max_carry, self.sublimb_size)
+                        .0;
 
                     stack.equal(carry_0, carry_1);
                     carry = carry_0.scale(*base).into();
@@ -251,9 +248,9 @@ impl<
     pub fn div(
         &self,
         stack: &mut Stack<N>,
-        w0: &Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-        w1: &Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-    ) -> Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
+        w0: &Integer<W, N>,
+        w1: &Integer<W, N>,
+    ) -> Integer<W, N> {
         assert!(!self.is_gt_max_operand(w0));
 
         // 1. find and range new witneses
@@ -312,7 +309,9 @@ impl<
 
                     let carry_0 = &stack.compose_second_degree(&terms[..], *shifter * base);
 
-                    let carry_1 = &stack.decompose(carry_0.value(), *max_carry, SUBLIMB_SIZE).0;
+                    let carry_1 = &stack
+                        .decompose(carry_0.value(), *max_carry, self.sublimb_size)
+                        .0;
 
                     stack.equal(carry_0, carry_1);
                     carry = carry_0.scale(*base).into();
@@ -335,11 +334,11 @@ impl<
     pub fn neg_mul_div(
         &self,
         stack: &mut Stack<N>,
-        w0: &Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-        w1: &Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-        divisor: &Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-        to_add: &[&Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>],
-    ) -> Integer<W, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
+        w0: &Integer<W, N>,
+        w1: &Integer<W, N>,
+        divisor: &Integer<W, N>,
+        to_add: &[&Integer<W, N>],
+    ) -> Integer<W, N> {
         assert!(!self.is_gt_max_operand(w0));
         assert!(!self.is_gt_max_operand(w1));
         assert!(!self.is_gt_max_operand(divisor));
@@ -427,7 +426,9 @@ impl<
 
                     let carry_0 = &stack.compose_second_degree(&terms[..], N::ZERO);
 
-                    let carry_1 = &stack.decompose(carry_0.value(), *max_carry, SUBLIMB_SIZE).0;
+                    let carry_1 = &stack
+                        .decompose(carry_0.value(), *max_carry, self.sublimb_size)
+                        .0;
 
                     stack.equal(carry_0, carry_1);
                     carry = carry_0.scale(*base).into();

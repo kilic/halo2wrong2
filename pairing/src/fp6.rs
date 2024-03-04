@@ -3,14 +3,8 @@ use circuitry::stack::Stack;
 use ff::PrimeField;
 use halo2::halo2curves::bn256::{FROBENIUS_COEFF_FQ6_C1, FROBENIUS_COEFF_FQ6_C2};
 
-impl<
-        N: PrimeField + Ord,
-        const NUMBER_OF_LIMBS: usize,
-        const LIMB_SIZE: usize,
-        const SUBLIMB_SIZE: usize,
-    > PairingChip<N, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE>
-{
-    pub(crate) fn fq6_one(&self, stack: &mut Stack<N>) -> Fq6<N, NUMBER_OF_LIMBS, LIMB_SIZE> {
+impl<N: PrimeField + Ord> PairingChip<N> {
+    pub(crate) fn fq6_one(&self, stack: &mut Stack<N>) -> Fq6<N> {
         Fq6 {
             c0: self.fq2_one(stack),
             c1: self.fq2_zero(stack),
@@ -18,7 +12,7 @@ impl<
         }
     }
 
-    pub(crate) fn fq6_zero(&self, stack: &mut Stack<N>) -> Fq6<N, NUMBER_OF_LIMBS, LIMB_SIZE> {
+    pub(crate) fn fq6_zero(&self, stack: &mut Stack<N>) -> Fq6<N> {
         Fq6 {
             c0: self.fq2_zero(stack),
             c1: self.fq2_zero(stack),
@@ -26,58 +20,35 @@ impl<
         }
     }
 
-    pub(crate) fn fq6_add(
-        &self,
-        stack: &mut Stack<N>,
-        a: &Fq6<N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-        b: &Fq6<N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-    ) -> Fq6<N, NUMBER_OF_LIMBS, LIMB_SIZE> {
+    pub(crate) fn fq6_add(&self, stack: &mut Stack<N>, a: &Fq6<N>, b: &Fq6<N>) -> Fq6<N> {
         let c0 = self.fq2_add(stack, &a.c0, &b.c0);
         let c1 = self.fq2_add(stack, &a.c1, &b.c1);
         let c2 = self.fq2_add(stack, &a.c2, &b.c2);
         Fq6 { c0, c1, c2 }
     }
 
-    pub(crate) fn fq6_double(
-        &self,
-        stack: &mut Stack<N>,
-        a: &Fq6<N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-    ) -> Fq6<N, NUMBER_OF_LIMBS, LIMB_SIZE> {
+    pub(crate) fn fq6_double(&self, stack: &mut Stack<N>, a: &Fq6<N>) -> Fq6<N> {
         let c0 = self.fq2_double(stack, &a.c0);
         let c1 = self.fq2_double(stack, &a.c1);
         let c2 = self.fq2_double(stack, &a.c2);
         Fq6 { c0, c1, c2 }
     }
 
-    pub(crate) fn fq6_sub(
-        &self,
-        stack: &mut Stack<N>,
-        a: &Fq6<N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-        b: &Fq6<N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-    ) -> Fq6<N, NUMBER_OF_LIMBS, LIMB_SIZE> {
+    pub(crate) fn fq6_sub(&self, stack: &mut Stack<N>, a: &Fq6<N>, b: &Fq6<N>) -> Fq6<N> {
         let c0 = self.fq2_sub(stack, &a.c0, &b.c0);
         let c1 = self.fq2_sub(stack, &a.c1, &b.c1);
         let c2 = self.fq2_sub(stack, &a.c2, &b.c2);
         Fq6 { c0, c1, c2 }
     }
 
-    pub(crate) fn fq6_neg(
-        &self,
-        stack: &mut Stack<N>,
-        a: &Fq6<N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-    ) -> Fq6<N, NUMBER_OF_LIMBS, LIMB_SIZE> {
+    pub(crate) fn fq6_neg(&self, stack: &mut Stack<N>, a: &Fq6<N>) -> Fq6<N> {
         let c0 = self.fq2_neg(stack, &a.c0);
         let c1 = self.fq2_neg(stack, &a.c1);
         let c2 = self.fq2_neg(stack, &a.c2);
         Fq6 { c0, c1, c2 }
     }
 
-    pub(crate) fn fq6_mul(
-        &self,
-        stack: &mut Stack<N>,
-        a: &Fq6<N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-        b: &Fq6<N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-    ) -> Fq6<N, NUMBER_OF_LIMBS, LIMB_SIZE> {
+    pub(crate) fn fq6_mul(&self, stack: &mut Stack<N>, a: &Fq6<N>, b: &Fq6<N>) -> Fq6<N> {
         let t0 = self.fq2_mul(stack, &a.c0, &b.c0);
         let t1 = self.fq2_mul(stack, &a.c1, &b.c1);
         let t2 = self.fq2_mul(stack, &a.c2, &b.c2);
@@ -109,10 +80,10 @@ impl<
     pub(crate) fn fq6_mul_by_01(
         &self,
         stack: &mut Stack<N>,
-        a: &Fq6<N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-        c0: &Fq2<N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-        c1: &Fq2<N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-    ) -> Fq6<N, NUMBER_OF_LIMBS, LIMB_SIZE> {
+        a: &Fq6<N>,
+        c0: &Fq2<N>,
+        c1: &Fq2<N>,
+    ) -> Fq6<N> {
         let a_a = self.fq2_mul(stack, &a.c0, c0);
         let b_b = self.fq2_mul(stack, &a.c1, c1);
         let tmp = self.fq2_add(stack, &a.c1, &a.c2);
@@ -137,11 +108,7 @@ impl<
         }
     }
 
-    pub(crate) fn fq6_square(
-        &self,
-        stack: &mut Stack<N>,
-        a: &Fq6<N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-    ) -> Fq6<N, NUMBER_OF_LIMBS, LIMB_SIZE> {
+    pub(crate) fn fq6_square(&self, stack: &mut Stack<N>, a: &Fq6<N>) -> Fq6<N> {
         let s0 = self.fq2_square(stack, &a.c0);
         let ab = self.fq2_mul(stack, &a.c0, &a.c1);
         let s1 = self.fq2_double(stack, &ab);
@@ -163,11 +130,7 @@ impl<
         Fq6 { c0, c1, c2 }
     }
 
-    pub(crate) fn fq6_mul_by_non_residue(
-        &self,
-        stack: &mut Stack<N>,
-        a: &Fq6<N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-    ) -> Fq6<N, NUMBER_OF_LIMBS, LIMB_SIZE> {
+    pub(crate) fn fq6_mul_by_non_residue(&self, stack: &mut Stack<N>, a: &Fq6<N>) -> Fq6<N> {
         let t0 = self.fq2_mul_by_non_residue(stack, &a.c2);
 
         Fq6 {
@@ -177,11 +140,7 @@ impl<
         }
     }
 
-    pub(crate) fn fq6_inverse(
-        &self,
-        stack: &mut Stack<N>,
-        a: &Fq6<N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-    ) -> Fq6<N, NUMBER_OF_LIMBS, LIMB_SIZE> {
+    pub(crate) fn fq6_inverse(&self, stack: &mut Stack<N>, a: &Fq6<N>) -> Fq6<N> {
         let t0 = self.fq2_square(stack, &a.c0);
         let t1 = self.fq2_mul(stack, &a.c1, &a.c2);
         let t1 = self.fq2_mul_by_non_residue(stack, &t1);
@@ -210,9 +169,9 @@ impl<
     pub(crate) fn fq6_frobenius_map(
         &self,
         stack: &mut Stack<N>,
-        a: &Fq6<N, NUMBER_OF_LIMBS, LIMB_SIZE>,
+        a: &Fq6<N>,
         power: usize,
-    ) -> Fq6<N, NUMBER_OF_LIMBS, LIMB_SIZE> {
+    ) -> Fq6<N> {
         let c0 = self.fq2_frobenius_map(stack, &a.c0, power);
         let c1 = self.fq2_frobenius_map(stack, &a.c1, power);
         let c2 = self.fq2_frobenius_map(stack, &a.c2, power);

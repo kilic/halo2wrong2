@@ -1,4 +1,4 @@
-use crate::{enforcement::RangeOp, utils::decompose_into_dyn, witness::Witness};
+use crate::{enforcement::RangeOp, utils::decompose_into, witness::Witness};
 use ff::PrimeField;
 use halo2::circuit::Value;
 use num_integer::Integer;
@@ -30,7 +30,7 @@ pub trait RangeChip<F: PrimeField + Ord>: Chip<RangeOp<F>, F> {
             (witness, vec![])
         } else {
             let limbs = value
-                .map(|v| decompose_into_dyn::<F, F>(&v, number_of_limbs, limb_size))
+                .map(|v| decompose_into::<F, F>(&v, number_of_limbs, limb_size))
                 .transpose_vec(number_of_limbs);
 
             let limbs = limbs

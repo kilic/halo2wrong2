@@ -4,36 +4,21 @@ use halo2::halo2curves::bn256::FROBENIUS_COEFF_FQ12_C1;
 
 use crate::{Fq12, Fq2, Fq6, PairingChip};
 
-impl<
-        N: PrimeField + Ord,
-        const NUMBER_OF_LIMBS: usize,
-        const LIMB_SIZE: usize,
-        const SUBLIMB_SIZE: usize,
-    > PairingChip<N, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE>
-{
-    pub(crate) fn fq12_one(&self, stack: &mut Stack<N>) -> Fq12<N, NUMBER_OF_LIMBS, LIMB_SIZE> {
+impl<N: PrimeField + Ord> PairingChip<N> {
+    pub(crate) fn fq12_one(&self, stack: &mut Stack<N>) -> Fq12<N> {
         Fq12 {
             c0: self.fq6_one(stack),
             c1: self.fq6_zero(stack),
         }
     }
 
-    pub(crate) fn fq12_conj(
-        &self,
-        stack: &mut Stack<N>,
-        a: &Fq12<N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-    ) -> Fq12<N, NUMBER_OF_LIMBS, LIMB_SIZE> {
+    pub(crate) fn fq12_conj(&self, stack: &mut Stack<N>, a: &Fq12<N>) -> Fq12<N> {
         let c0 = a.c0.clone();
         let c1 = self.fq6_neg(stack, &a.c1);
         Fq12 { c0, c1 }
     }
 
-    pub(crate) fn fq12_mul(
-        &self,
-        stack: &mut Stack<N>,
-        a: &Fq12<N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-        b: &Fq12<N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-    ) -> Fq12<N, NUMBER_OF_LIMBS, LIMB_SIZE> {
+    pub(crate) fn fq12_mul(&self, stack: &mut Stack<N>, a: &Fq12<N>, b: &Fq12<N>) -> Fq12<N> {
         let t = self.fq6_mul(stack, &a.c0, &b.c0);
         let t1 = self.fq6_mul(stack, &a.c1, &b.c1);
         let t2 = self.fq6_add(stack, &b.c0, &b.c1);
@@ -46,11 +31,7 @@ impl<
         Fq12 { c0, c1 }
     }
 
-    pub(crate) fn fq12_square(
-        &self,
-        stack: &mut Stack<N>,
-        a: &Fq12<N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-    ) -> Fq12<N, NUMBER_OF_LIMBS, LIMB_SIZE> {
+    pub(crate) fn fq12_square(&self, stack: &mut Stack<N>, a: &Fq12<N>) -> Fq12<N> {
         let t0 = self.fq6_add(stack, &a.c0, &a.c1);
         let t2 = self.fq6_mul(stack, &a.c0, &a.c1);
         let t1 = self.fq6_mul_by_non_residue(stack, &a.c1);
@@ -66,11 +47,11 @@ impl<
     pub(crate) fn fq12_mul_by_034(
         &self,
         stack: &mut Stack<N>,
-        a: &Fq12<N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-        c0: &Fq2<N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-        c3: &Fq2<N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-        c4: &Fq2<N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-    ) -> Fq12<N, NUMBER_OF_LIMBS, LIMB_SIZE> {
+        a: &Fq12<N>,
+        c0: &Fq2<N>,
+        c3: &Fq2<N>,
+        c4: &Fq2<N>,
+    ) -> Fq12<N> {
         let t0 = Fq6 {
             c0: self.fq2_mul(stack, &a.c0.c0, c0),
             c1: self.fq2_mul(stack, &a.c0.c1, c0),
@@ -87,11 +68,7 @@ impl<
         Fq12 { c0, c1 }
     }
 
-    pub(crate) fn fq12_inverse(
-        &self,
-        stack: &mut Stack<N>,
-        a: &Fq12<N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-    ) -> Fq12<N, NUMBER_OF_LIMBS, LIMB_SIZE> {
+    pub(crate) fn fq12_inverse(&self, stack: &mut Stack<N>, a: &Fq12<N>) -> Fq12<N> {
         let t0 = self.fq6_square(stack, &a.c0);
         let t1 = self.fq6_square(stack, &a.c1);
         let t1 = self.fq6_mul_by_non_residue(stack, &t1);
@@ -106,9 +83,9 @@ impl<
     pub(crate) fn fq12_frobenius_map(
         &self,
         stack: &mut Stack<N>,
-        a: &Fq12<N, NUMBER_OF_LIMBS, LIMB_SIZE>,
+        a: &Fq12<N>,
         power: usize,
-    ) -> Fq12<N, NUMBER_OF_LIMBS, LIMB_SIZE> {
+    ) -> Fq12<N> {
         let c0 = self.fq6_frobenius_map(stack, &a.c0, power);
         let c1 = self.fq6_frobenius_map(stack, &a.c1, power);
 
@@ -133,16 +110,7 @@ impl<
         }
     }
 
-    fn fq4_square(
-        &self,
-        stack: &mut Stack<N>,
-
-        a0: &Fq2<N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-        a1: &Fq2<N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-    ) -> (
-        Fq2<N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-        Fq2<N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-    ) {
+    fn fq4_square(&self, stack: &mut Stack<N>, a0: &Fq2<N>, a1: &Fq2<N>) -> (Fq2<N>, Fq2<N>) {
         let t0 = self.fq2_square(stack, a0);
         let t1 = self.fq2_square(stack, a1);
         let t2 = self.fq2_mul_by_non_residue(stack, &t1);
@@ -154,11 +122,7 @@ impl<
         (c0, c1)
     }
 
-    pub(crate) fn cyclotomic_square(
-        &self,
-        stack: &mut Stack<N>,
-        a: &Fq12<N, NUMBER_OF_LIMBS, LIMB_SIZE>,
-    ) -> Fq12<N, NUMBER_OF_LIMBS, LIMB_SIZE> {
+    pub(crate) fn cyclotomic_square(&self, stack: &mut Stack<N>, a: &Fq12<N>) -> Fq12<N> {
         let (t3, t4) = self.fq4_square(stack, &a.c0.c0, &a.c1.c1);
         let t2 = self.fq2_sub(stack, &t3, &a.c0.c0);
         let t2 = self.fq2_double(stack, &t2);

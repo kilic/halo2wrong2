@@ -9,9 +9,9 @@ use ff::PrimeField;
 use group::{Curve, Group};
 use halo2::halo2curves::CurveAffine;
 
-pub struct FixMul<C: CurveAffine, const NUMBER_OF_LIMBS: usize, const LIMB_SIZE: usize> {
-    pub table: Vec<Vec<Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>>>,
-    pub correction: Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>,
+pub struct FixMul<C: CurveAffine> {
+    pub table: Vec<Vec<Point<C::Base, C::Scalar>>>,
+    pub correction: Point<C::Base, C::Scalar>,
 }
 
 macro_rules! div_ceil {
@@ -20,18 +20,8 @@ macro_rules! div_ceil {
     };
 }
 
-impl<
-        C: CurveAffine,
-        const NUMBER_OF_LIMBS: usize,
-        const LIMB_SIZE: usize,
-        const SUBLIMB_SIZE: usize,
-    > BaseFieldEccChip<C, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE>
-{
-    pub fn prepare_mul_fix(
-        &self,
-        stack: &mut Stack<C::Scalar>,
-        point: C,
-    ) -> FixMul<C, NUMBER_OF_LIMBS, LIMB_SIZE> {
+impl<C: CurveAffine> BaseFieldEccChip<C> {
+    pub fn prepare_mul_fix(&self, stack: &mut Stack<C::Scalar>, point: C) -> FixMul<C> {
         let window_size = 4usize;
 
         pub(crate) fn binary_table<C: CurveAffine>(
@@ -98,9 +88,9 @@ impl<
     pub fn mul_fix(
         &self,
         stack: &mut Stack<C::Scalar>,
-        prepared: &FixMul<C, NUMBER_OF_LIMBS, LIMB_SIZE>,
+        prepared: &FixMul<C>,
         scalar: &Witness<C::Scalar>,
-    ) -> Point<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE> {
+    ) -> Point<C::Base, C::Scalar> {
         let window_size = 4;
 
         let (_scalar, bits) = stack.decompose(scalar.value(), C::Scalar::NUM_BITS as usize, 1);

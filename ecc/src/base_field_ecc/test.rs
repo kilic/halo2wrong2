@@ -10,7 +10,6 @@ use ff::FromUniformBytes;
 use group::{Curve, Group};
 use halo2::halo2curves::bn256::{G1Affine, G1};
 use halo2::halo2curves::CurveExt;
-use halo2::plonk::{Advice, Column};
 use halo2::{
     circuit::{Layouter, SimpleFloorPlanner, Value},
     dev::MockProver,
@@ -39,22 +38,18 @@ pub(crate) fn _multiexp_naive_var<C: CurveExt>(point: &[C], scalar: &[C::ScalarE
         })
 }
 
-fn make_stack<
-    C: CurveAffine,
-    const NUMBER_OF_LIMBS: usize,
-    const LIMB_SIZE: usize,
-    const SUBLIMB_SIZE: usize,
->(
-    rns: &Rns<C::Base, C::Scalar, NUMBER_OF_LIMBS, LIMB_SIZE>,
+fn make_stack<C: CurveAffine>(
+    rns: &Rns<C::Base, C::Scalar>,
     witness_aux: Value<C>,
     constant_aux: C,
     window_size: usize,
     number_of_points: usize,
+    sublimb_size: usize,
 ) -> Stack<C::Scalar> {
-    let stack = &mut Stack::<C::Scalar>::with_rom(NUMBER_OF_LIMBS);
+    let stack = &mut Stack::<C::Scalar>::with_rom(rns.number_of_limbs);
 
-    let ch: BaseFieldEccChip<C, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE> =
-        BaseFieldEccChip::new(rns, witness_aux, constant_aux);
+    let ch: BaseFieldEccChip<C> =
+        BaseFieldEccChip::new(rns, witness_aux, constant_aux, sublimb_size);
 
     fn value<T>(e: T) -> Value<T> {
         Value::known(e)
@@ -132,7 +127,7 @@ fn make_stack<
 
         #[allow(clippy::type_complexity)]
         let (points, scalars): (
-            Vec<Point<C::Base, C::ScalarExt, NUMBER_OF_LIMBS, LIMB_SIZE>>,
+            Vec<Point<C::Base, C::ScalarExt>>,
             Vec<Witness<C::ScalarExt>>,
         ) = points
             .into_iter()
@@ -170,13 +165,7 @@ fn make_stack<
 }
 
 #[derive(Clone)]
-struct TestConfig<
-    C: CurveAffine,
-    const RANGE_W: usize,
-    const NUMBER_OF_LIMBS: usize,
-    const LIMB_SIZE: usize,
-    const SUBLIMB_SIZE: usize,
-> {
+struct TestConfig<C: CurveAffine, const RANGE_W: usize> {
     vertical_gate: VerticalGate<RANGE_W>,
     vanilla_gate: VanillaGate,
     range_gate: RangeGate,
@@ -190,28 +179,17 @@ struct Params<C: CurveAffine> {
     constant_aux: C,
     number_of_points: usize,
     window: usize,
+    limb_size: usize,
+    sublimb_size: usize,
 }
 
 #[derive(Default)]
-struct TestCircuit<
-    C: CurveAffine,
-    const RANGE_W: usize,
-    const NUMBER_OF_LIMBS: usize,
-    const LIMB_SIZE: usize,
-    const SUBLIMB_SIZE: usize,
-> {
+struct TestCircuit<C: CurveAffine, const RANGE_W: usize> {
     params: Params<C>,
 }
 
-impl<
-        C: CurveAffine,
-        const RANGE_W: usize,
-        const NUMBER_OF_LIMBS: usize,
-        const LIMB_SIZE: usize,
-        const SUBLIMB_SIZE: usize,
-    > Circuit<C::Scalar> for TestCircuit<C, RANGE_W, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE>
-{
-    type Config = TestConfig<C, RANGE_W, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE>;
+impl<C: CurveAffine, const RANGE_W: usize> Circuit<C::Scalar> for TestCircuit<C, RANGE_W> {
+    type Config = TestConfig<C, RANGE_W>;
     type FloorPlanner = SimpleFloorPlanner;
     type Params = Params<C>;
 
@@ -227,9 +205,10 @@ impl<
         let vertical_gate = VerticalGate::configure(meta, &range_gate, advices.try_into().unwrap());
         let vanilla_gate = VanillaGate::configure(meta);
 
+        let rns = Rns::construct(params.limb_size);
+
         let shared_columns = vanilla_gate.advice_colums();
-        let rom_value_columns: [Column<Advice>; NUMBER_OF_LIMBS] =
-            shared_columns[0..NUMBER_OF_LIMBS].try_into().unwrap();
+        let rom_value_columns = shared_columns[0..rns.number_of_limbs].to_vec();
         let query_fraction = vertical_gate.advice_columns()[0];
 
         let rom_gate = ROMGate::configure(
@@ -239,15 +218,14 @@ impl<
             &rom_value_columns[..],
         );
 
-        let rns = Rns::construct();
-
         let t0 = start_timer!(|| "witness gen");
-        let stack = make_stack::<C, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE>(
+        let stack = make_stack::<C>(
             &rns,
             params.witness_aux,
             params.constant_aux,
             params.window,
             params.number_of_points,
+            params.sublimb_size,
         );
         end_timer!(t0);
 
@@ -293,14 +271,10 @@ impl<
     }
 }
 
-fn run_test<
-    C: CurveAffine,
-    const RANGE_W: usize,
-    const NUMBER_OF_LIMBS: usize,
-    const LIMB_SIZE: usize,
-    const SUBLIMB_SIZE: usize,
->(
+fn run_test<C: CurveAffine, const RANGE_W: usize>(
     k: u32,
+    limb_size: usize,
+    sublimb_size: usize,
     number_of_points: usize,
     window: usize,
 ) where
@@ -314,8 +288,10 @@ fn run_test<
         constant_aux,
         number_of_points,
         window,
+        limb_size,
+        sublimb_size,
     };
-    let circuit = TestCircuit::<C, RANGE_W, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE> { params };
+    let circuit = TestCircuit::<C, RANGE_W> { params };
     let public_inputs = vec![];
     let prover = match MockProver::run(k, &circuit, public_inputs) {
         Ok(prover) => prover,
@@ -328,13 +304,7 @@ fn run_test<
 fn test_base_field_ecc() {
     use halo2::halo2curves::bn256::G1Affine;
 
-    run_test::<
-        G1Affine,
-        2,
-        3,  // number of limbs
-        90, // limb size
-        18, // sublimb size
-    >(19, 100, 6);
+    run_test::<G1Affine, 2>(19, 90, 18, 100, 6);
 }
 
 #[test]
@@ -348,7 +318,9 @@ fn bench_prover() {
         constant_aux,
         number_of_points: 100,
         window: 6,
+        limb_size: 90,
+        sublimb_size: 18,
     };
-    let circuit = TestCircuit::<G1Affine, 2, 3, 90, 18> { params };
+    let circuit = TestCircuit::<G1Affine, 2> { params };
     run_test_prover(19, circuit);
 }

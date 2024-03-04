@@ -18,21 +18,14 @@ use crate::Point;
 
 use super::GeneralEccChip;
 
-impl<
-        Emulated: CurveAffine,
-        N: PrimeField + Ord,
-        const NUMBER_OF_LIMBS: usize,
-        const LIMB_SIZE: usize,
-        const SUBLIMB_SIZE: usize,
-    > GeneralEccChip<Emulated, N, NUMBER_OF_LIMBS, LIMB_SIZE, SUBLIMB_SIZE>
-{
+impl<Emulated: CurveAffine, N: PrimeField + Ord> GeneralEccChip<Emulated, N> {
     pub fn msm_sliding_vertical(
         &self,
         stack: &mut Stack<N>,
-        points: &[Point<Emulated::Base, N, NUMBER_OF_LIMBS, LIMB_SIZE>],
-        scalars: &[Integer<Emulated::Scalar, N, NUMBER_OF_LIMBS, LIMB_SIZE>],
+        points: &[Point<Emulated::Base, N>],
+        scalars: &[Integer<Emulated::Scalar, N>],
         window_size: usize,
-    ) -> Point<Emulated::Base, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
+    ) -> Point<Emulated::Base, N> {
         let number_of_points = points.len();
         assert!(number_of_points > 0);
         assert_eq!(number_of_points, scalars.len());
@@ -79,10 +72,10 @@ impl<
                     .iter()
                     .enumerate()
                     .flat_map(|(i, limb)| {
-                        let word_size = if i == NUMBER_OF_LIMBS - 1 {
+                        let word_size = if i == self.ch_scalar.rns().number_of_limbs - 1 {
                             self.ch_base.rns().max_most_significant_limb_size
                         } else {
-                            LIMB_SIZE
+                            self.ch_scalar.rns().limb_size
                         };
 
                         let (_scalar, bits) = stack.decompose(limb.value(), word_size, 1);
@@ -124,10 +117,10 @@ impl<
         &self,
         stack: &mut Stack<N>,
         tag: N,
-        points: &[Point<Emulated::Base, N, NUMBER_OF_LIMBS, LIMB_SIZE>],
-        scalars: &[Integer<Emulated::Scalar, N, NUMBER_OF_LIMBS, LIMB_SIZE>],
+        points: &[Point<Emulated::Base, N>],
+        scalars: &[Integer<Emulated::Scalar, N>],
         window_size: usize,
-    ) -> Point<Emulated::Base, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
+    ) -> Point<Emulated::Base, N> {
         let number_of_points = points.len();
         assert!(number_of_points > 0);
         assert_eq!(number_of_points, scalars.len());
@@ -184,10 +177,10 @@ impl<
                     .iter()
                     .enumerate()
                     .flat_map(|(i, limb)| {
-                        let word_size = if i == NUMBER_OF_LIMBS - 1 {
+                        let word_size = if i == self.ch_scalar.rns().number_of_limbs - 1 {
                             self.ch_base.rns().max_most_significant_limb_size
                         } else {
-                            LIMB_SIZE
+                            self.ch_scalar.rns().limb_size
                         };
 
                         let (_scalar, bits) = stack.decompose(limb.value(), word_size, 1);
@@ -238,10 +231,10 @@ impl<
     pub fn msm_sliding_horizontal(
         &self,
         stack: &mut Stack<N>,
-        points: &[Point<Emulated::Base, N, NUMBER_OF_LIMBS, LIMB_SIZE>],
-        scalars: &[Integer<Emulated::Scalar, N, NUMBER_OF_LIMBS, LIMB_SIZE>],
+        points: &[Point<Emulated::Base, N>],
+        scalars: &[Integer<Emulated::Scalar, N>],
         window_size: usize,
-    ) -> Point<Emulated::Base, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
+    ) -> Point<Emulated::Base, N> {
         let number_of_points = points.len();
         assert!(number_of_points > 0);
         assert_eq!(number_of_points, scalars.len());
@@ -251,7 +244,7 @@ impl<
 
         let mut aux_pow2 = self.assign_point(stack, self.witness_aux);
         let mut aux_round_acc = aux_pow2.clone();
-        let tables: Vec<Vec<Point<Emulated::Base, N, NUMBER_OF_LIMBS, LIMB_SIZE>>> = points
+        let tables: Vec<Vec<Point<Emulated::Base, N>>> = points
             .iter()
             .enumerate()
             .map(|(i, point)| {
@@ -284,10 +277,10 @@ impl<
                     .iter()
                     .enumerate()
                     .flat_map(|(i, limb)| {
-                        let word_size = if i == NUMBER_OF_LIMBS - 1 {
+                        let word_size = if i == self.ch_scalar.rns().number_of_limbs - 1 {
                             self.ch_base.rns().max_most_significant_limb_size
                         } else {
-                            LIMB_SIZE
+                            self.ch_scalar.rns().limb_size
                         };
 
                         let (_scalar, bits) = stack.decompose(limb.value(), word_size, 1);
@@ -331,10 +324,10 @@ impl<
         &self,
         stack: &mut Stack<N>,
         tag: N,
-        points: &[Point<Emulated::Base, N, NUMBER_OF_LIMBS, LIMB_SIZE>],
-        scalars: &[Integer<Emulated::Scalar, N, NUMBER_OF_LIMBS, LIMB_SIZE>],
+        points: &[Point<Emulated::Base, N>],
+        scalars: &[Integer<Emulated::Scalar, N>],
         window_size: usize,
-    ) -> Point<Emulated::Base, N, NUMBER_OF_LIMBS, LIMB_SIZE> {
+    ) -> Point<Emulated::Base, N> {
         let number_of_points = points.len();
         assert!(number_of_points > 0);
         assert_eq!(number_of_points, scalars.len());
@@ -392,10 +385,10 @@ impl<
                     .iter()
                     .enumerate()
                     .flat_map(|(i, limb)| {
-                        let word_size = if i == NUMBER_OF_LIMBS - 1 {
+                        let word_size = if i == self.ch_scalar.rns().number_of_limbs - 1 {
                             self.ch_base.rns().max_most_significant_limb_size
                         } else {
-                            LIMB_SIZE
+                            self.ch_scalar.rns().limb_size
                         };
 
                         let (_scalar, limbs) =
