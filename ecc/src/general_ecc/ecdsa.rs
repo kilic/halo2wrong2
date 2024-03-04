@@ -95,6 +95,7 @@ mod test {
             })
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn make_stack<
         Emulated: CurveAffine,
         N: PrimeField + Ord,
@@ -117,7 +118,7 @@ mod test {
             GeneralEccChip::new(rns_base, rns_scalar, witness_aux, constant_aux);
 
         let g = Emulated::generator();
-        let g_prepared = ecc_ch.prepare_mul_fix(stack, g.into());
+        let g_prepared = ecc_ch.prepare_mul_fix(stack, g);
 
         let message = ecc_ch.assign_scalar(stack, message);
         let pub_key = ecc_ch.assign_point(stack, pub_key);
