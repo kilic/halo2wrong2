@@ -189,6 +189,12 @@ fn rand_arithmetic<F: PrimeField + Ord>() -> Stack<F> {
         stack.assert_not_zero(w0);
         let w1 = &stack.assign_rand_witness();
         stack.assert_not_equal(w0, w1);
+
+        let must_be_one = stack.is_equal(w0, w0);
+        stack.assert_one(&must_be_one);
+
+        let must_be_zero = stack.is_equal(w0, w1);
+        stack.assert_zero(&must_be_zero);
     }
 
     // constant registry

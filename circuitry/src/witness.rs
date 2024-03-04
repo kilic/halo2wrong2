@@ -387,6 +387,20 @@ impl<F: PrimeField> std::ops::Mul<&F> for Witness<F> {
     }
 }
 
+impl<F: PrimeField> std::ops::Mul<&Scaled<F>> for Witness<F> {
+    type Output = SecondDegreeScaled<F>;
+    fn mul(self, rhs: &Scaled<F>) -> Self::Output {
+        SecondDegreeScaled::new(&self, &rhs.witness, rhs.factor)
+    }
+}
+
+impl<F: PrimeField> std::ops::Mul<Scaled<F>> for Witness<F> {
+    type Output = SecondDegreeScaled<F>;
+    fn mul(self, rhs: Scaled<F>) -> Self::Output {
+        SecondDegreeScaled::new(&self, &rhs.witness, rhs.factor)
+    }
+}
+
 impl<F: PrimeField> std::ops::Mul<F> for Scaled<F> {
     type Output = Self;
     fn mul(self, rhs: F) -> Self::Output {
@@ -412,6 +426,20 @@ impl<F: PrimeField> std::ops::Mul<&F> for Scaled<F> {
     type Output = Self;
     fn mul(self, rhs: &F) -> Self::Output {
         Scaled::new(&self.witness, *rhs * self.factor)
+    }
+}
+
+impl<F: PrimeField> std::ops::Mul<&Witness<F>> for Scaled<F> {
+    type Output = SecondDegreeScaled<F>;
+    fn mul(self, rhs: &Witness<F>) -> Self::Output {
+        SecondDegreeScaled::new(&self.witness, rhs, self.factor)
+    }
+}
+
+impl<F: PrimeField> std::ops::Mul<Witness<F>> for Scaled<F> {
+    type Output = SecondDegreeScaled<F>;
+    fn mul(self, rhs: Witness<F>) -> Self::Output {
+        SecondDegreeScaled::new(&self.witness, &rhs, self.factor)
     }
 }
 

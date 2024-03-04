@@ -207,6 +207,57 @@ impl<F: PrimeField + Ord> Stack<F> {
         let zero = self.sub_from_constant(F::ONE, w0);
         self.is_zero(&zero)
     }
+
+    pub fn is_equal(&mut self, w0: &Witness<F>, w1: &Witness<F>) -> Witness<F> {
+        let (x, r) = w0
+            .value()
+            .zip(w1.value())
+            .map(|(w0, w1)| {
+                let dif = w0 - w1;
+                Option::from(dif.invert())
+                    .map(|dif_inverted| (dif_inverted, F::ZERO))
+                    .unwrap_or_else(|| (F::ONE, F::ONE))
+            })
+            .unzip();
+
+        let x = self.new_witness(x);
+        let r = self.assign_bit(r);
+
+        let dif = self.sub(w0, w1);
+
+        // 0 = rx - r - x + u
+        let u =
+            self.compose_second_degree(&[(r * x * -F::ONE).into(), r.into(), x.into()], F::ZERO);
+
+        // 0 = u * dif + r - 1e
+        self.zero_sum_second_degree(&[(u * dif).into(), r.into()], -F::ONE);
+
+        r
+    }
+
+    pub fn is_equal_to_constant(&mut self, w0: &Witness<F>, constant: F) -> Witness<F> {
+        let (x, r) = w0
+            .value()
+            .map(|w0| {
+                let dif = constant - w0;
+                Option::from(dif.invert())
+                    .map(|dif_inverted| (dif_inverted, F::ZERO))
+                    .unwrap_or_else(|| (F::ONE, F::ONE))
+            })
+            .unzip();
+        let x = self.new_witness(x);
+        let r = self.assign_bit(r);
+        let dif = self.sub_from_constant(constant, w0);
+
+        // 0 = rx - r - x + u
+        let u =
+            self.compose_second_degree(&[(r * x * -F::ONE).into(), dif.into(), x.into()], F::ZERO);
+
+        // 0 = u * dif + r - 1
+        self.zero_sum_second_degree(&[(u * dif).into(), r.into()], -F::ONE);
+
+        r
+    }
 }
 
 impl<F: PrimeField + Ord> Chip<crate::enforcement::FirstDegree<F>, F> for Stack<F> {
