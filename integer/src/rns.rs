@@ -48,10 +48,33 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const LIMB_SIZE
     Rns<W, N, NUMBER_OF_LIMBS, LIMB_SIZE>
 {
     pub fn construct() -> Self {
+        let one = &BigUint::one();
+
+        macro_rules! log_floor {
+            ($u:expr) => {
+                &(one << ($u.bits() as usize - 1))
+            };
+        }
+
         // wrong field modulus: `w`
         let wrong_modulus = &modulus::<W>();
         // native field modulus: `n`
         let native_modulus = &modulus::<N>();
+
+        // `op * op < q * w + r < bin * p`
+        // `CRT = bin * nat`
+
+        // `p` native modulus, `w` wrong modulus and `r` max remainder are known
+        // `op` max operand  (some power of two minus one)
+        // `q`  max quotient (some power of two minus one)
+        // `bin` binary modulus to satisfy CRT where `CRT = bin * nat`
+
+        // 1. estimate `bin`
+        // 2. find `q`
+        // 3. find `op`
+        // 4. if `q` or `op` is shy against `w`e increase `bin` once and try again
+
+        let max_limb = (one << LIMB_SIZE) - 1usize;
 
         // assert that number of limbs is set correctly
         assert_eq!(
@@ -59,78 +82,85 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const LIMB_SIZE
             div_ceil(wrong_modulus.bits() as usize, LIMB_SIZE)
         );
 
-        let one = &BigUint::one();
-
         // Max remainder is next power of two of wrong modulus.
         // Witness remainder might overflow the wrong modulus but it is limited
         // to the next power of two of the wrong modulus.
-        let max_remainder = &((one << wrong_modulus.bits()) - 1usize);
+        let max_remainder = (one << wrong_modulus.bits()) - 1usize;
 
-        // Binary modulus will be adjusted (increased) by allignment of limb size
-        let pre_binary_modulus = wrong_modulus.pow(2) / native_modulus;
+        // with a conservative margin we start with max operand is equal to max remainder approximation
+        let pre_binary_modulus = max_remainder.pow(2) / native_modulus;
         let pre_binary_modulus_size = pre_binary_modulus.bits() as usize;
-        let t = one << pre_binary_modulus_size;
-        assert!(t * native_modulus > wrong_modulus.pow(2));
+        let mut number_of_carries = div_ceil(pre_binary_modulus_size, LIMB_SIZE);
 
-        // Number of carries in partial schoolbook multiplication
-        let number_of_carries = div_ceil(pre_binary_modulus_size, LIMB_SIZE);
-        // Find the binary modulus
-        let binary_modulus_size = number_of_carries * LIMB_SIZE;
-        let binary_modulus = &(one << binary_modulus_size);
-        assert!(binary_modulus * native_modulus > wrong_modulus.pow(2));
+        // rounding down max quotient and max operand to `2^k - 1` for cheaper range checks
+        // may result in a smaller binary modulus so we need to refine number of carries and
+        // binary modulus size
+        let n_try = 2;
 
-        // Multiplication is constrained as:
-        //
-        // `a * b = w * quotient + remainder`
-        //
-        // where `quotient` and `remainder` is witnesses, `a` and `b` are assigned
-        // operands. Both sides of the equation must not wrap `crt_modulus`.
-        let crt_modulus = &(binary_modulus * native_modulus);
+        // TODO: also try to maximize max operand and max quotient under the same binary modulus?
 
-        // Find maxium quotient that won't wrap `quotient * wrong + remainder` side of
-        // the equation under `crt_modulus`.
-        let pre_max_quotient: &BigUint = &((crt_modulus - max_remainder) / wrong_modulus);
+        let (number_of_carries, binary_modulus, crt_modulus, max_quotient, max_operand) = (0
+            ..n_try)
+            .find_map(|i| {
+                println!(
+                    "RNS construction, limb_size: {}, try: {}, number_of_carries {}",
+                    LIMB_SIZE, i, number_of_carries
+                );
+                let binary_modulus_size = number_of_carries * LIMB_SIZE;
+                let binary_modulus = one << binary_modulus_size;
+                let crt_modulus = &binary_modulus * native_modulus;
 
-        // Lower this value to make this value suitable for bit range checks.
-        let max_quotient = &((one << (pre_max_quotient.bits() as usize - 1)) - 1usize);
+                // find max quotient
+                // first value is not power of two minus one
+                let pre_max_quotient = (&crt_modulus - &max_remainder) / wrong_modulus;
+                // so lets floor it to there
+                let max_quotient = (one << (pre_max_quotient.bits() - 1)) - 1usize;
 
-        // Find the maximum operand: in order to meet completeness maximum allowed
-        // operand value is saturated as below:
-        //
-        // `max_operand ^ 2 < max_quotient * wrong + max_remainder`
-        //
-        // So that prover can find `quotient` and `remainder` witnesses for any
-        // allowed input operands. And it also automativally ensures that:
-        //
-        // `max_operand^2 < crt_modulus`
-        //
-        // must hold.
-        let max_operand_bit_len = ((max_quotient * wrong_modulus + max_remainder).bits() - 1) / 2;
-        let max_operand = &((one << max_operand_bit_len) - one);
+                // `op * op < q * w + r`
+                let tt = &max_quotient * wrong_modulus + &max_remainder;
+                let pre_max_operand = tt.sqrt();
+                let max_operand = log_floor!(pre_max_operand) - 1usize;
 
-        // Sanity check
+                if &max_quotient < wrong_modulus {
+                    println!("q < w");
+                    number_of_carries += 1; // TODO consider increasing number of carries
+                    return None;
+                }
+                if &max_operand < wrong_modulus {
+                    println!("op < w");
+                    number_of_carries += 1; // TODO consider increasing number of carries
+                    return None;
+                }
+
+                Some((
+                    number_of_carries,
+                    binary_modulus,
+                    crt_modulus,
+                    max_quotient,
+                    max_operand,
+                ))
+            })
+            .unwrap();
+
         {
-            let lhs = &(max_operand * max_operand);
-            let rhs = &(max_quotient * wrong_modulus + max_remainder);
-            assert!(binary_modulus > wrong_modulus);
-            assert!(binary_modulus > native_modulus);
-            assert!(max_remainder > wrong_modulus);
-            assert!(max_operand > wrong_modulus);
-            assert!(max_quotient > wrong_modulus);
+            let lhs = &max_operand * &max_operand;
+            let rhs = &max_quotient * wrong_modulus + &max_remainder;
+            assert!(&binary_modulus > wrong_modulus);
+            assert!(&binary_modulus > native_modulus);
+            assert!(&max_remainder > wrong_modulus);
+
+            assert!(rhs < crt_modulus);
+            assert!(lhs < rhs);
+
+            assert!(&max_quotient > wrong_modulus);
+            assert!(&max_operand > wrong_modulus);
+
             assert!(max_remainder < binary_modulus);
             assert!(max_operand < binary_modulus);
             assert!(max_quotient < binary_modulus);
-            assert!(rhs < crt_modulus);
-            assert!(lhs < rhs);
         }
 
-        // Most significant limbs are subjected to different range checks which will be
-        // probably less than full sized limbs.
-
-        // Max reduced limb value, exept the most significant limb.
-        let max_limb = (one << LIMB_SIZE) - 1usize;
-
-        let max_most_significant_limb = max_remainder >> ((NUMBER_OF_LIMBS - 1) * LIMB_SIZE);
+        let max_most_significant_limb = &max_remainder >> ((NUMBER_OF_LIMBS - 1) * LIMB_SIZE);
         let max_most_significant_limb_size = max_most_significant_limb.bits() as usize;
         let max_remainder_limbs = std::iter::repeat_with(|| max_limb.clone())
             .take(NUMBER_OF_LIMBS - 1)
@@ -139,7 +169,7 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const LIMB_SIZE
             .try_into()
             .unwrap();
 
-        let max_most_significant_limb = max_quotient >> ((NUMBER_OF_LIMBS - 1) * LIMB_SIZE);
+        let max_most_significant_limb = &max_quotient >> ((NUMBER_OF_LIMBS - 1) * LIMB_SIZE);
         let max_quotient_limbs = std::iter::repeat_with(|| max_limb.clone())
             .take(NUMBER_OF_LIMBS - 1)
             .chain(std::iter::once(max_most_significant_limb))
@@ -147,7 +177,7 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const LIMB_SIZE
             .try_into()
             .unwrap();
 
-        let max_most_significant_limb = max_operand >> ((NUMBER_OF_LIMBS - 1) * LIMB_SIZE);
+        let max_most_significant_limb = &max_operand >> ((NUMBER_OF_LIMBS - 1) * LIMB_SIZE);
         let max_operand_limbs = std::iter::repeat_with(|| max_limb.clone())
             .take(NUMBER_OF_LIMBS - 1)
             .chain(std::iter::once(max_most_significant_limb))
