@@ -101,6 +101,7 @@ impl<W: PrimeField, N: PrimeField> Rns<W, N> {
         // 3. find `op`
         // 4. if `q` or `op` is shy against `w`e increase `bin` once and try again
 
+        println!("w: {}", wrong_modulus.bits());
         let number_of_limbs = div_ceil(wrong_modulus.bits() as usize, limb_size);
         let max_limb = (one << limb_size) - 1usize;
 
@@ -120,20 +121,15 @@ impl<W: PrimeField, N: PrimeField> Rns<W, N> {
         let pre_binary_modulus_size = pre_binary_modulus.bits() as usize;
         let mut number_of_carries = div_ceil(pre_binary_modulus_size, limb_size);
 
+        println!(
+            "RNS construction, limb_size: {limb_size}, number_of_limbs: {number_of_limbs}, number_of_carries {number_of_carries}"
+        );
+
         // rounding down max quotient and max operand to `2^k - 1` for cheaper range checks
         // may result in a smaller binary modulus so we need to refine number of carries and
         // binary modulus size
-        let n_try = 2;
-
-        // TODO: also try to maximize max operand and max quotient under the same binary modulus?
-
-        let (number_of_carries, binary_modulus, crt_modulus, max_quotient, max_operand) = (0
-            ..n_try)
-            .find_map(|i| {
-                println!(
-                    "RNS construction, limb_size: {}, try: {}, number_of_carries {}",
-                    limb_size, i, number_of_carries
-                );
+        let (number_of_carries, binary_modulus, crt_modulus, max_quotient, max_operand) = (0..2)
+            .find_map(|_| {
                 let binary_modulus_size = number_of_carries * limb_size;
                 let binary_modulus = one << binary_modulus_size;
                 let crt_modulus = &binary_modulus * native_modulus;
@@ -142,7 +138,12 @@ impl<W: PrimeField, N: PrimeField> Rns<W, N> {
                 // first value is not power of two minus one
                 let pre_max_quotient = (&crt_modulus - &max_remainder) / wrong_modulus;
                 // so lets floor it to there
-                let max_quotient = (one << (pre_max_quotient.bits() - 1)) - 1usize;
+                let mut max_quotient = (one << (pre_max_quotient.bits() - 1)) - 1usize;
+
+                let number_of_quotient_limbs = div_ceil(max_quotient.bits() as usize, limb_size);
+                if number_of_quotient_limbs > number_of_limbs {
+                    max_quotient = (one << (number_of_limbs * limb_size)) - 1usize;
+                }
 
                 // `op * op < q * w + r`
                 let tt = &max_quotient * wrong_modulus + &max_remainder;
@@ -150,13 +151,13 @@ impl<W: PrimeField, N: PrimeField> Rns<W, N> {
                 let max_operand = log_floor!(pre_max_operand) - 1usize;
 
                 if &max_quotient < wrong_modulus {
-                    println!("q < w");
-                    number_of_carries += 1; // TODO consider increasing number of carries
+                    println!("q < w; go second try");
+                    number_of_carries += 1;
                     return None;
                 }
                 if &max_operand < wrong_modulus {
-                    println!("op < w");
-                    number_of_carries += 1; // TODO consider increasing number of carries
+                    println!("op < w; go second try");
+                    number_of_carries += 1;
                     return None;
                 }
 
@@ -217,7 +218,7 @@ impl<W: PrimeField, N: PrimeField> Rns<W, N> {
         // `w' = [w'_0, w'_1, ... ]`
         let big_neg_wrong_in_binary = binary_modulus - wrong_modulus;
         let big_neg_wrong_limbs_in_binary =
-            decompose(&big_neg_wrong_in_binary, number_of_limbs, limb_size);
+            decompose(&big_neg_wrong_in_binary, number_of_carries, limb_size);
 
         let neg_wrong_limbs_in_binary: Vec<_> = big_neg_wrong_limbs_in_binary
             .iter()
@@ -449,9 +450,14 @@ impl<W: PrimeField, N: PrimeField> Rns<W, N> {
             &self.big_neg_wrong_limbs_in_binary,
         ); // TODO: precompute
 
-        // transpose
-        let to_add = (0..self.number_of_carries)
-            .map(|i| to_add.iter().map(|e| e[i].clone()).collect::<Vec<_>>());
+        let to_add = (0..self.number_of_limbs).map(|i| {
+            to_add
+                .iter()
+                .map(|e| e[i].clone())
+                .chain(std::iter::repeat(BigUint::zero()))
+                .take(self.number_of_carries)
+                .collect::<Vec<_>>()
+        });
 
         ww.iter()
             .zip(pq)
@@ -486,9 +492,14 @@ impl<W: PrimeField, N: PrimeField> Rns<W, N> {
         ); // TODO: precompute
         let rd = schoolbook::<BigUint, BigUint, BigUint>(&self.max_remainder_limbs, divisor);
 
-        // transpose
-        let to_add = (0..self.number_of_carries)
-            .map(|i| to_add.iter().map(|e| e[i].clone()).collect::<Vec<_>>());
+        let to_add = (0..self.number_of_limbs).map(|i| {
+            to_add
+                .iter()
+                .map(|e| e[i].clone())
+                .chain(std::iter::repeat(BigUint::zero()))
+                .take(self.number_of_carries)
+                .collect::<Vec<_>>()
+        });
 
         ww.iter()
             .zip(rd)
@@ -510,166 +521,3 @@ impl<W: PrimeField, N: PrimeField> Rns<W, N> {
             .collect()
     }
 }
-
-// pub fn construct2(limb_size: usize) -> Self {
-//     // wrong field modulus: `w`
-//     let wrong_modulus = &modulus::<W>();
-//     // native field modulus: `n`
-//     let native_modulus = &modulus::<N>();
-
-//     let number_of_limbs = div_ceil(wrong_modulus.bits() as usize, limb_size);
-
-//     let one = &BigUint::one();
-
-//     // Max remainder is next power of two of wrong modulus.
-//     // Witness remainder might overflow the wrong modulus but it is limited
-//     // to the next power of two of the wrong modulus.
-//     let max_remainder = &((one << wrong_modulus.bits()) - 1usize);
-
-//     // Binary modulus will be adjusted (increased) by allignment of limb size
-//     let pre_binary_modulus = wrong_modulus.pow(2) / native_modulus;
-//     let pre_binary_modulus_size = pre_binary_modulus.bits() as usize;
-//     let t = one << pre_binary_modulus_size;
-//     assert!(t * native_modulus > wrong_modulus.pow(2));
-
-//     // Number of carries in partial schoolbook multiplication
-//     let number_of_carries = div_ceil(pre_binary_modulus_size, limb_size);
-//     // Find the binary modulus
-//     let binary_modulus_size = number_of_carries * limb_size;
-//     let binary_modulus = &(one << binary_modulus_size);
-//     assert!(binary_modulus * native_modulus > wrong_modulus.pow(2));
-
-//     // Multiplication is constrained as:
-//     //
-//     // `a * b = w * quotient + remainder`
-//     //
-//     // where `quotient` and `remainder` is witnesses, `a` and `b` are assigned
-//     // operands. Both sides of the equation must not wrap `crt_modulus`.
-//     let crt_modulus = &(binary_modulus * native_modulus);
-
-//     // Find maxium quotient that won't wrap `quotient * wrong + remainder` side of
-//     // the equation under `crt_modulus`.
-//     let pre_max_quotient: &BigUint = &((crt_modulus - max_remainder) / wrong_modulus);
-
-//     // Lower this value to make this value suitable for bit range checks.
-//     let max_quotient = &((one << (pre_max_quotient.bits() as usize - 1)) - 1usize);
-
-//     // Find the maximum operand: in order to meet completeness maximum allowed
-//     // operand value is saturated as below:
-//     //
-//     // `max_operand ^ 2 < max_quotient * wrong + max_remainder`
-//     //
-//     // So that prover can find `quotient` and `remainder` witnesses for any
-//     // allowed input operands. And it also automativally ensures that:
-//     //
-//     // `max_operand^2 < crt_modulus`
-//     //
-//     // must hold.
-//     let max_operand_bit_len = ((max_quotient * wrong_modulus + max_remainder).bits() - 1) / 2;
-//     let max_operand = &((one << max_operand_bit_len) - one);
-
-//     // Sanity check
-//     {
-//         let lhs = &(max_operand * max_operand);
-//         let rhs = &(max_quotient * wrong_modulus + max_remainder);
-//         assert!(binary_modulus > wrong_modulus);
-//         assert!(binary_modulus > native_modulus);
-//         assert!(max_remainder > wrong_modulus);
-//         assert!(max_operand > wrong_modulus);
-//         assert!(max_quotient > wrong_modulus);
-//         assert!(max_remainder < binary_modulus);
-//         assert!(max_operand < binary_modulus);
-//         assert!(max_quotient < binary_modulus);
-//         assert!(rhs < crt_modulus);
-//         assert!(lhs < rhs);
-//     }
-
-//     // Most significant limbs are subjected to different range checks which will be
-//     // probably less than full sized limbs.
-
-//     // Max reduced limb value, exept the most significant limb.
-//     let max_limb = (one << limb_size) - 1usize;
-
-//     let max_most_significant_limb = max_remainder >> ((number_of_limbs - 1) * limb_size);
-//     let max_most_significant_limb_size = max_most_significant_limb.bits() as usize;
-//     let max_remainder_limbs = std::iter::repeat_with(|| max_limb.clone())
-//         .take(number_of_limbs - 1)
-//         .chain(std::iter::once(max_most_significant_limb))
-//         .collect::<Vec<_>>();
-
-//     let max_most_significant_limb = max_quotient >> ((number_of_limbs - 1) * limb_size);
-//     let max_quotient_limbs = std::iter::repeat_with(|| max_limb.clone())
-//         .take(number_of_limbs - 1)
-//         .chain(std::iter::once(max_most_significant_limb))
-//         .collect::<Vec<_>>();
-
-//     let max_most_significant_limb = max_operand >> ((number_of_limbs - 1) * limb_size);
-//     let max_operand_limbs = std::iter::repeat_with(|| max_limb.clone())
-//         .take(number_of_limbs - 1)
-//         .chain(std::iter::once(max_most_significant_limb))
-//         .collect::<Vec<_>>();
-
-//     let max_reduction_quotient = (one << limb_size) - one;
-//     let max_unreduced_value = wrong_modulus * max_reduction_quotient.clone();
-//     // 1.5x of the max reduced limb
-//     let max_unreduced_limb = &(one << (limb_size + limb_size / 2)) - one;
-
-//     // negative wrong field modulus moduli binary modulus `w'`
-//     // `w' = (T - w)`
-//     // `w' = [w'_0, w'_1, ... ]`
-//     let big_neg_wrong_in_binary = binary_modulus - wrong_modulus;
-//     let big_neg_wrong_limbs_in_binary =
-//         decompose(&big_neg_wrong_in_binary, number_of_limbs, limb_size);
-
-//     let neg_wrong_limbs_in_binary = big_neg_wrong_limbs_in_binary
-//         .iter()
-//         .map(big_to_fe_unsafe)
-//         .collect::<Vec<_>>();
-
-//     let big_wrong_limbs = decompose(wrong_modulus, number_of_limbs, limb_size);
-//     let wrong_limbs = big_wrong_limbs.iter().map(big_to_fe).collect::<Vec<N>>();
-//     // `w-1 = [w_0-1 , w_1, ... ] `
-
-//     let wrong_in_native: N = big_to_fe(&(wrong_modulus % native_modulus));
-
-//     // Calculate shifter elements
-//     let two = N::from(2);
-//     // Left shifts field element by `u * limb_size` bits
-//     let left_shifters = (0..number_of_limbs)
-//         .map(|i| two.pow([(i * limb_size) as u64, 0, 0, 0]))
-//         .collect::<Vec<N>>();
-//     let right_shifters = left_shifters
-//         .iter()
-//         .map(|e| e.invert().unwrap())
-//         .collect::<Vec<_>>();
-
-//     Self {
-//         number_of_limbs,
-//         limb_size,
-//         left_shifters,
-//         right_shifters,
-//         wrong_modulus: wrong_modulus.clone(),
-//         native_modulus: native_modulus.clone(),
-//         max_reduction_quotient,
-//         neg_wrong_limbs_in_binary,
-//         big_neg_wrong_limbs_in_binary,
-//         wrong_limbs,
-//         big_wrong_limbs,
-//         wrong_in_native,
-//         max_remainder: max_remainder.clone(),
-//         max_operand: max_operand.clone(),
-//         max_quotient: max_quotient.clone(),
-//         max_quotient_limbs,
-//         max_remainder_limbs,
-//         max_operand_limbs,
-//         _max_limb: max_limb,
-//         number_of_carries,
-
-//         max_most_significant_limb_size,
-
-//         _max_unreduced_limb: max_unreduced_limb,
-//         _max_unreduced_value: max_unreduced_value,
-
-//         _marker: PhantomData,
-//     }
-// }

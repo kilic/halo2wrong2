@@ -329,7 +329,6 @@ impl<W: PrimeField, N: PrimeField + Ord> IntegerChip<W, N> {
     }
 
     // ported from barretenberg
-    // https://github.com/Azte
 
     pub fn neg_mul_div(
         &self,

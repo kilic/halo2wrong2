@@ -1,6 +1,12 @@
-use crate::{enforcement::RangeOp, utils::decompose_into, witness::Witness};
+use crate::{
+    enforcement::RangeOp,
+    utils::{compose_into, decompose_into, fe_to_big},
+    witness::Witness,
+};
+use ark_std::One;
 use ff::PrimeField;
 use halo2::circuit::Value;
+use num_bigint::BigUint;
 use num_integer::Integer;
 
 use super::Chip;
@@ -27,10 +33,27 @@ pub trait RangeChip<F: PrimeField + Ord>: Chip<RangeOp<F>, F> {
         let number_of_limbs = number_of_limbs + if overflow_size > 0 { 1 } else { 0 };
         if number_of_limbs == 1 {
             let witness = self.range(value, word_size);
+            #[cfg(feature = "prover-sanity")]
+            {
+                witness.value.map(|value| {
+                    let big = fe_to_big(&value);
+                    assert!(big < BigUint::one() << word_size);
+                });
+            }
             (witness, vec![])
         } else {
             let limbs = value
-                .map(|v| decompose_into::<F, F>(&v, number_of_limbs, limb_size))
+                .map(|value| {
+                    let decomposed = decompose_into::<F, F>(&value, number_of_limbs, limb_size);
+
+                    #[cfg(feature = "prover-sanity")]
+                    {
+                        let _value: F = compose_into(&decomposed[..], limb_size);
+                        assert_eq!(_value, value)
+                    }
+
+                    decomposed
+                })
                 .transpose_vec(number_of_limbs);
 
             let limbs = limbs

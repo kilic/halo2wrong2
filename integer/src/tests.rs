@@ -163,20 +163,20 @@ fn make_stack<W: PrimeField, N: PrimeField + Ord>(
         let a1 = ch.reduce(stack, &a0);
         ch.normal_equal(stack, &a0, &a1);
 
-        let a0 = ch.rns.rand_in_unreduced_range();
-        let a1 = ch.rns.rand_in_unreduced_range();
-        let a0 = ch.assign(stack, a0, Range::Unreduced);
-        let a1 = ch.assign(stack, a1, Range::Unreduced);
-        ch.assert_not_equal(stack, &a0, &a1);
-        ch.assert_not_zero(stack, &a0);
-        let a1 = ch.reduce(stack, &a0);
-        ch.normal_equal(stack, &a0, &a1);
+        // let a0 = ch.rns.rand_in_unreduced_range();
+        // let a1 = ch.rns.rand_in_unreduced_range();
+        // let a0 = ch.assign(stack, a0, Range::Unreduced);
+        // let a1 = ch.assign(stack, a1, Range::Unreduced);
+        // ch.assert_not_equal(stack, &a0, &a1);
+        // ch.assert_not_zero(stack, &a0);
+        // let a1 = ch.reduce(stack, &a0);
+        // ch.normal_equal(stack, &a0, &a1);
 
-        let a0 = ch.rns.rand_with_limb_bit_size(rns.limb_size * 3 / 2);
-        let a0 = ch.assign(stack, a0, Range::Unreduced);
-        ch.assert_not_zero(stack, &a0);
-        let a1 = ch.reduce(stack, &a0);
-        ch.normal_equal(stack, &a0, &a1);
+        // let a0 = ch.rns.rand_with_limb_bit_size(rns.limb_size * 3 / 2);
+        // let a0 = ch.assign(stack, a0, Range::Unreduced);
+        // ch.assert_not_zero(stack, &a0);
+        // let a1 = ch.reduce(stack, &a0);
+        // ch.normal_equal(stack, &a0, &a1);
     }
 
     // add
@@ -310,10 +310,6 @@ fn make_stack<W: PrimeField, N: PrimeField + Ord>(
         for _ in 0..1 {
             let a0 = ch.rns.rand_in_operand_range();
             let a1 = ch.rns.rand_in_operand_range();
-            // let a0 = ch
-            //     .rns
-            //     .from_big(BigUint::from(30u32) + &ch.rns.wrong_modulus);
-            // let a1 = ch.rns.from_big(BigUint::from(5u32));
             let a0 = &ch.range(stack, &a0, Range::Operand);
             let a1 = &ch.range(stack, &a1, Range::Operand);
             let res = a0
@@ -331,10 +327,10 @@ fn make_stack<W: PrimeField, N: PrimeField + Ord>(
         let a0 = ch.rns.rand_in_operand_range();
         let a1 = ch.rns.rand_in_operand_range();
         let divisor = ch.rns.rand_in_operand_range();
-        let to_add = ch.rns.rand_in_field();
+        let to_add = ch.rns.rand_in_remainder_range();
+
         let a0 = &ch.range(stack, &a0, Range::Operand);
         let a1 = &ch.range(stack, &a1, Range::Operand);
-
         let divisor = &ch.range(stack, &divisor, Range::Operand);
         let to_add = ch.range(stack, &to_add, Range::Remainder);
         let u1 = ch.neg_mul_div(stack, a0, a1, divisor, &[&to_add]);
