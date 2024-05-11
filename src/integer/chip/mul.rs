@@ -4,7 +4,7 @@ use crate::circuitry::chip::Core;
 use crate::circuitry::stack::Stack;
 use crate::circuitry::witness::{Composable, Scaled, SecondDegreeScaled, Term, Witness};
 use crate::integer::chip::IntegerChip;
-use crate::integer::schoolbook;
+use crate::integer::{schoolbook, ConstantInteger};
 use crate::integer::{Integer, Range};
 use ff::PrimeField;
 
@@ -241,6 +241,187 @@ impl<W: PrimeField, N: PrimeField + Ord> IntegerChip<W, N> {
             .collect();
 
         stack.zero_sum_second_degree(&terms, N::ZERO);
+
+        result
+    }
+
+    pub fn mul_constant(
+        &self,
+        stack: &mut Stack<N>,
+        w0: &Integer<W, N>,
+        w1: &ConstantInteger<W, N>,
+        to_add: &[&Integer<W, N>],
+    ) -> Integer<W, N> {
+        let w0 = &self.reduce_if_necessary(stack, w0);
+
+        // 1. find and range new witneses
+
+        let (result, quotient) = self.rns.mul_witness_constant(w0, w1, to_add);
+        let result = self.range(stack, &result, Range::Remainder);
+        let quotient = self.range(stack, &quotient, Range::MulQuotient);
+
+        // 2. constrain carries
+
+        {
+            let max_carries = {
+                let to_add = to_add
+                    .iter()
+                    .map(|to_add| to_add.max_vals())
+                    .collect::<Vec<_>>();
+
+                self.rns
+                    .mul_max_carries(w0.max_vals(), w1.big_limbs(), &to_add)
+            };
+
+            let base = self.rns.rsh(1);
+
+            let ww = schoolbook::<Witness<N>, N, Scaled<N>>(w0.limbs(), w1.limbs());
+            let ww = ww
+                .iter()
+                .map(|t| t.iter().map(|e| e.scale(*base).as_term()));
+
+            let pq = schoolbook::<Witness<N>, N, Scaled<N>>(
+                quotient.limbs(),
+                &self.rns.neg_wrong_limbs_in_binary,
+            );
+            let pq = pq
+                .iter()
+                .map(|t| t.iter().map(|e| e.scale(*base).as_term()));
+
+            let result = result
+                .limbs()
+                .iter()
+                .map(|e| e.scale(base.neg()).as_term())
+                .chain(std::iter::repeat(Term::Zero));
+
+            let to_add = to_add
+                .iter()
+                .map(|to_add| {
+                    to_add
+                        .limbs()
+                        .iter()
+                        .map(|e| e.scale(*base).as_term())
+                        .chain(std::iter::repeat(Term::Zero))
+                        .take(self.rns.number_of_carries)
+                        .collect::<Vec<_>>()
+                })
+                .collect::<Vec<_>>();
+
+            // and transpose for each level of carries
+            let to_add = (0..self.rns.number_of_carries)
+                .map(|i| to_add.iter().map(|e| e[i].clone()).collect::<Vec<_>>())
+                .collect::<Vec<_>>();
+
+            let mut carry: Term<N> = Term::Zero;
+            ww.zip(pq)
+                .zip(result)
+                .zip(to_add)
+                .zip(max_carries.iter())
+                .take(self.rns.number_of_carries)
+                .for_each(|((((ww, pq), result), to_add), max_carry)| {
+                    let terms = ww
+                        .chain(pq)
+                        .chain(std::iter::once(result))
+                        .chain(to_add)
+                        .chain(std::iter::once(carry.clone()))
+                        .collect::<Vec<_>>();
+
+                    let carry_0 = &stack.compose_second_degree(&terms[..], N::ZERO);
+
+                    let carry_1 = &stack
+                        .decompose(carry_0.value(), *max_carry, self.sublimb_size)
+                        .0;
+
+                    stack.equal(carry_0, carry_1);
+                    carry = carry_0.scale(*base).into();
+                })
+        }
+
+        // 3. constrain native value
+
+        let terms: Vec<Term<N>> = to_add
+            .iter()
+            .map(|to_add| to_add.native().add().into())
+            .chain(std::iter::once((w0.native() * w1.native()).into()))
+            .chain(std::iter::once(
+                (quotient.native() * -self.rns.wrong_in_native).into(),
+            ))
+            .chain(std::iter::once(result.native().sub().into()))
+            .collect();
+
+        stack.zero_sum_second_degree(&terms, N::ZERO);
+
+        result
+    }
+
+    pub fn inv(&self, stack: &mut Stack<N>, w1: &Integer<W, N>) -> Integer<W, N> {
+        // 1. find and range new witneses
+
+        let (result, quotient) = self.rns.inv_witness(w1);
+
+        let result = self.range(stack, &result, Range::Remainder);
+        let quotient = self.range(stack, &quotient, Range::MulQuotient);
+
+        // 2. constrain carries
+
+        {
+            let max_carries = self
+                .rns
+                .mul_max_carries(result.max_vals(), w1.max_vals(), &[]);
+
+            let base = self.rns.rsh(1);
+
+            let ww: Vec<Vec<SecondDegreeScaled<N>>> = schoolbook::<
+                Witness<N>,
+                Witness<N>,
+                SecondDegreeScaled<N>,
+            >(result.limbs(), w1.limbs());
+
+            let ww = ww
+                .iter()
+                .map(|t| t.iter().map(|e| e.scale(*base).as_term()));
+
+            let pq = schoolbook::<Witness<N>, N, Scaled<N>>(
+                quotient.limbs(),
+                &self.rns.neg_wrong_limbs_in_binary,
+            );
+
+            let pq = pq
+                .iter()
+                .map(|t| t.iter().map(|e| e.scale(*base).as_term()));
+
+            let mut carry: Term<N> = Term::Zero;
+
+            let mut first = true;
+            ww.zip(pq)
+                .zip(max_carries.iter())
+                .take(self.rns.number_of_carries)
+                .for_each(|((ww, pq), max_carry)| {
+                    let terms = ww
+                        .chain(pq)
+                        .chain(std::iter::once(carry.clone()))
+                        .collect::<Vec<_>>();
+
+                    let carry_0 = &stack.compose_second_degree(
+                        &terms[..],
+                        if first { base.neg() } else { N::ZERO },
+                    );
+                    first = false;
+
+                    let carry_1 = &stack
+                        .decompose(carry_0.value(), *max_carry, self.sublimb_size)
+                        .0;
+
+                    stack.equal(carry_0, carry_1);
+                    carry = carry_0.scale(*base).into();
+                })
+        }
+
+        // 3. constrain native value
+
+        let w0w1: Term<N> = (result.native() * w1.native()).into();
+        let pq: Term<N> = (quotient.native() * -self.rns.wrong_in_native).into();
+        stack.zero_sum_second_degree(&[w0w1, pq], -N::ONE);
 
         result
     }
