@@ -342,6 +342,39 @@ impl<W: PrimeField, N: PrimeField> Rns<W, N> {
     }
 
     #[allow(clippy::type_complexity)]
+    pub(crate) fn mul_witness_constant(
+        &self,
+        w0: &Integer<W, N>,
+        w1: &ConstantInteger<W, N>,
+        to_add: &[&Integer<W, N>],
+    ) -> (UnassignedInteger<W, N>, UnassignedInteger<W, N>) {
+        let to_add = to_add.iter().map(|e| e.big());
+        let to_add: Value<Vec<_>> = Value::from_iter(to_add);
+        let (quotient, result) = w0
+            .big()
+            .zip(to_add)
+            .map(|(w0, to_add)| {
+                let to_add = to_add.iter().sum::<BigUint>();
+                (w0 * w1.big() + to_add).div_rem(&self.wrong_modulus)
+            })
+            .unzip();
+
+        #[cfg(feature = "prover-sanity")]
+        {
+            quotient
+                .as_ref()
+                .map(|quotient| assert!(quotient < &self.max_quotient));
+        }
+
+        let quotient =
+            UnassignedInteger::<W, N>::from_big(quotient, self.number_of_limbs, self.limb_size);
+        let result =
+            UnassignedInteger::<W, N>::from_big(result, self.number_of_limbs, self.limb_size);
+
+        (result, quotient)
+    }
+
+    #[allow(clippy::type_complexity)]
     pub(crate) fn neg_mul_add_div_witness(
         &self,
         w0: &Integer<W, N>,
@@ -368,6 +401,45 @@ impl<W: PrimeField, N: PrimeField> Rns<W, N> {
                 (result, quotient)
             })
             .unzip();
+
+        #[cfg(feature = "prover-sanity")]
+        {
+            quotient
+                .as_ref()
+                .map(|quotient| assert!(quotient < &self.max_quotient));
+        }
+
+        let quotient =
+            UnassignedInteger::<W, N>::from_big(quotient, self.number_of_limbs, self.limb_size);
+        let result =
+            UnassignedInteger::<W, N>::from_big(result, self.number_of_limbs, self.limb_size);
+
+        (result, quotient)
+    }
+
+    pub(crate) fn inv_witness(
+        &self,
+        denom: &Integer<W, N>,
+    ) -> (UnassignedInteger<W, N>, UnassignedInteger<W, N>) {
+        let (result, quotient) = denom
+            .big()
+            .map(|denom| {
+                let denom_inv = invert::<W>(&denom);
+                let result = &denom_inv % &self.wrong_modulus;
+                let (quotient, must_be_one) = (&denom * &result).div_rem(&self.wrong_modulus);
+                assert_eq!(must_be_one, BigUint::one());
+
+                (result, quotient)
+            })
+            .unzip();
+
+        #[cfg(feature = "synth-sanity")]
+        {
+            let result_max = &self.max_remainder;
+            let max_lhs = result_max * denom.max();
+            let max_rhs = &self.max_quotient * &self.wrong_modulus;
+            assert!(max_rhs > max_lhs);
+        }
 
         #[cfg(feature = "prover-sanity")]
         {

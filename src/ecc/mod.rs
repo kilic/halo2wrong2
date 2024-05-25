@@ -5,6 +5,7 @@ use halo2::{circuit::Value, halo2curves::CurveAffine};
 
 pub mod base_field_ecc;
 pub mod general_ecc;
+pub mod pairing;
 
 #[derive(Clone, Debug)]
 pub struct Point<W: PrimeField, N: PrimeField> {
