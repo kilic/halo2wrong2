@@ -1,4 +1,4 @@
-use super::{fq6::Fq6, Fq2, PairingChip};
+use super::{fq6::Fq6, BNPairingChip, Fq2};
 use crate::circuitry::{stack::Stack, witness::Witness};
 use ff::PrimeField;
 use halo2::{
@@ -21,7 +21,7 @@ impl<N: PrimeField> Fq12<N> {
     }
 }
 
-impl<N: PrimeField + Ord> PairingChip<N> {
+impl<N: PrimeField + Ord> BNPairingChip<N> {
     pub(crate) fn fq12_one(&self, stack: &mut Stack<N>) -> Fq12<N> {
         Fq12 {
             c0: self.fq6_one(stack),
@@ -92,18 +92,17 @@ impl<N: PrimeField + Ord> PairingChip<N> {
         stack: &mut Stack<N>,
         f: &mut Fq12<N>,
 
-        c3: &Fq2<N>,
-        c4: &Fq2<N>,
+        c0: &Fq2<N>,
+        c1: &Fq2<N>,
     ) {
-        let t = self.fq6_mul_by_01(stack, &f.c1, c3, c4);
-        let t = self.fq6_mul_by_non_residue(stack, &t);
-        let c0 = self.fq6_add(stack, &f.c0, &t);
+        let t0 = self.fq6_mul_by_01(stack, &f.c1, c0, c1);
+        let x1 = self.fq6_add(stack, &t0, &f.c0);
+        let t0 = self.fq6_mul_by_01(stack, &f.c0, c0, c1);
+        let t1 = self.fq6_mul_by_non_residue(stack, &f.c1);
+        let x0 = self.fq6_add(stack, &t0, &t1);
 
-        let t = self.fq6_mul_by_01(stack, &f.c0, c3, c4);
-        let c1 = self.fq6_add(stack, &f.c1, &t);
-
-        f.c0 = c0;
-        f.c1 = c1;
+        f.c0 = x0;
+        f.c1 = x1;
     }
 
     pub(crate) fn fq12_frobenius_map(

@@ -1,4 +1,4 @@
-use super::{Fq2, PairingChip};
+use super::{Fq2, BNPairingChip};
 use crate::circuitry::{stack::Stack, witness::Witness};
 use ff::PrimeField;
 use halo2::{
@@ -23,7 +23,7 @@ impl<N: PrimeField> Fq6<N> {
     }
 }
 
-impl<N: PrimeField + Ord> PairingChip<N> {
+impl<N: PrimeField + Ord> BNPairingChip<N> {
     pub(crate) fn fq6_one(&self, stack: &mut Stack<N>) -> Fq6<N> {
         Fq6 {
             c0: self.fq2_one(stack),

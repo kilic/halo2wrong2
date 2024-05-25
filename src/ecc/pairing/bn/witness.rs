@@ -1,9 +1,7 @@
 use ff::{Field, PrimeField};
 use group::prime::PrimeCurveAffine;
 use halo2::halo2curves::bn256::{self, Fq, Fq12};
-use halo2::halo2curves::bn256::{
-    Fq2, G1Affine, G2Affine, FROBENIUS_COEFF_FQ6_C1, SIX_U_PLUS_2_NAF, XI_TO_Q_MINUS_1_OVER_2,
-};
+use halo2::halo2curves::bn256::{Fq2, G1Affine, G2Affine, FROBENIUS_COEFF_FQ6_C1};
 use num_bigint::BigUint;
 use num_traits::Num;
 
@@ -75,7 +73,7 @@ pub(crate) fn miller_loop(p1: &[G1Affine], p2: &[G2Affine]) -> Fq12 {
     let mut f = Fq12::one();
     let mut acc = terms.iter().map(|(_, q)| (*q).clone()).collect::<Vec<_>>();
 
-    SIX_U_PLUS_2_NAF
+    super::SIX_U_PLUS_2_NAF
         .iter()
         .rev()
         .skip(1)
@@ -104,7 +102,7 @@ pub(crate) fn miller_loop(p1: &[G1Affine], p2: &[G2Affine]) -> Fq12 {
         q1.x.conjugate();
         q1.x.mul_assign(&FROBENIUS_COEFF_FQ6_C1[1]);
         q1.y.conjugate();
-        q1.y.mul_assign(&XI_TO_Q_MINUS_1_OVER_2);
+        q1.y.mul_assign(&super::XI_TO_Q_MINUS_1_OVER_2);
         add_eval(&mut f, acc, &q1, p, false);
     });
 

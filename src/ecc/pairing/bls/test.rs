@@ -1,4 +1,4 @@
-use super::PairingChip;
+use super::BLSPairingChip;
 use crate::circuitry::{
     gates::{range::RangeGate, vanilla::VanillaGate, vertical::VerticalGate},
     stack::Stack,
@@ -6,10 +6,11 @@ use crate::circuitry::{
 };
 use crate::integer::rns::Rns;
 use ark_std::{end_timer, start_timer, Zero};
+use ff::Field;
 use halo2::{
     circuit::{Layouter, SimpleFloorPlanner, Value},
     dev::MockProver,
-    halo2curves::bn256::{Fr, G1Affine, G2Affine},
+    halo2curves::bls12381::{Fr, G1Affine, G2Affine},
     plonk::{Circuit, ConstraintSystem, Error},
 };
 
@@ -31,10 +32,9 @@ fn make_stack(n: usize, limb_size: usize, sublimb_size: usize) -> Stack<Fr> {
 
     let g1 = vec![a1, b1];
     let g2 = vec![a2, b2];
-    // let g2_fixed = g2.clone();
 
     let rns: Rns<_, Fr> = Rns::construct(limb_size);
-    let ch: PairingChip<Fr> = PairingChip::new(&rns, sublimb_size);
+    let ch: BLSPairingChip<Fr> = BLSPairingChip::new(&rns, sublimb_size);
 
     let stack = &mut Stack::default();
     let g1 = g1
@@ -47,8 +47,9 @@ fn make_stack(n: usize, limb_size: usize, sublimb_size: usize) -> Stack<Fr> {
         .map(|g2| ch.assign_point2(stack, Value::known(*g2)))
         .collect::<Vec<_>>();
 
-    ch.pairing_check(stack, &g1[..], &g2[..]);
-    // ch.pairing_check_fixed(stack, &g1[..], &g2_fixed[..]);
+    let _ = ch.miller_loop(stack, &g1[..], &g2[..]);
+
+    // println!("{:#?}", f.value());
 
     stack.clone()
 }
@@ -150,6 +151,6 @@ fn run_test<const RANGE_W: usize>(k: u32, limb_size: usize, sublimb_size: usize,
 }
 
 #[test]
-fn test_pairing_check() {
-    run_test::<2>(21, 90, 18, 2);
+fn test_bls_pairing_check() {
+    run_test::<2>(21, 80, 16, 2);
 }
